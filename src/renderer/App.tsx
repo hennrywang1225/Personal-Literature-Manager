@@ -1,4 +1,4 @@
-const App = (): JSX.Element => {
+export function App(): JSX.Element {
   return (
     <main className="app-placeholder">
       <h1>个人文献管理器</h1>
@@ -6,5 +6,3 @@ const App = (): JSX.Element => {
     </main>
   )
 }
-
-export default App

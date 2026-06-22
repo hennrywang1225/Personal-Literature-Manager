@@ -1,7 +1,7 @@
 {
-  "name": "literature-manager",
+  "name": "personal-literature-manager",
   "version": "0.1.0",
-  "description": "Windows desktop literature manager",
+  "description": "Personal Windows literature manager",
   "main": "dist/main/main.js",
   "type": "module",
   "scripts": {

@@ -1,5 +1,5 @@
-appId: com.local.literaturemanager
-productName: Literature Manager
+appId: com.local.personal-literature-manager
+productName: Personal Literature Manager
 directories:
   output: release
 files:
