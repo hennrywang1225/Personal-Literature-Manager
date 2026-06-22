@@ -7,6 +7,7 @@ const createWindow = (): void => {
     height: 860,
     minWidth: 1050,
     minHeight: 720,
+    title: 'Personal Literature Manager',
     show: false,
     webPreferences: {
       contextIsolation: true,
