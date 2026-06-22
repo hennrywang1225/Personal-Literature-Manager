@@ -126,6 +126,8 @@ export async function openLibraryDatabase({
   raw.run('pragma foreign_keys = on')
   raw.exec(schemaSql)
 
+  let transactionDepth = 0
+
   return {
     raw,
     exec(sql, params) {
@@ -150,14 +152,37 @@ export async function openLibraryDatabase({
       return rows
     },
     transaction<T>(fn: () => T): T {
-      raw.run('begin')
+      const savepointName = `transaction_${transactionDepth}`
+
+      if (transactionDepth === 0) {
+        raw.run('begin')
+      } else {
+        raw.run(`savepoint ${savepointName}`)
+      }
+
+      transactionDepth += 1
 
       try {
         const result = fn()
-        raw.run('commit')
+        transactionDepth -= 1
+
+        if (transactionDepth === 0) {
+          raw.run('commit')
+        } else {
+          raw.run(`release savepoint ${savepointName}`)
+        }
+
         return result
       } catch (error) {
-        raw.run('rollback')
+        transactionDepth -= 1
+
+        if (transactionDepth === 0) {
+          raw.run('rollback')
+        } else {
+          raw.run(`rollback to savepoint ${savepointName}`)
+          raw.run(`release savepoint ${savepointName}`)
+        }
+
         throw error
       }
     },

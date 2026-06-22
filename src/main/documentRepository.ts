@@ -334,6 +334,7 @@ export function createDocumentRepository(db: LibraryDatabase) {
   return {
     upsertCategory,
     upsertTag,
+    transaction: db.transaction,
     createDocument,
     updateDocument,
     getSnapshot,

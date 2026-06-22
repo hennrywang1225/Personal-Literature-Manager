@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { rm } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
 import { DEFAULT_IMPORTANCE } from '../shared/constants'
 import type {
@@ -92,32 +93,51 @@ export function createImportService({
   async function confirmImports(
     confirmations: ImportConfirmation[],
   ): Promise<DocumentRecord[]> {
-    const imported: DocumentRecord[] = []
+    const copiedFiles: string[] = []
 
-    for (const confirmation of confirmations) {
-      const originalFileName = originalFileNameFromPath(confirmation.sourcePath)
-      const fileType = detectFileType(originalFileName)
-      const stored = await store.copyIntoLibrary(
-        confirmation.sourcePath,
-        storageId(),
-        originalFileName,
-      )
-      const title = cleanWhitespace(confirmation.title) || titleFromFileName(originalFileName)
+    try {
+      const prepared = []
 
-      imported.push(
-        repo.createDocument({
-          ...confirmation,
-          title,
-          importance: confirmation.importance ?? DEFAULT_IMPORTANCE,
+      for (const confirmation of confirmations) {
+        const originalFileName = originalFileNameFromPath(confirmation.sourcePath)
+        const fileType = detectFileType(originalFileName)
+        const stored = await store.copyIntoLibrary(
+          confirmation.sourcePath,
+          storageId(),
+          originalFileName,
+        )
+        const title =
+          cleanWhitespace(confirmation.title) || titleFromFileName(originalFileName)
+
+        copiedFiles.push(stored.absolutePath)
+        prepared.push({
+          confirmation,
           fileType,
           originalFileName,
-          storedFileName: stored.storedFileName,
-          storedFilePath: stored.relativePath,
-        }),
-      )
-    }
+          stored,
+          title,
+        })
+      }
 
-    return imported
+      return repo.transaction(() =>
+        prepared.map(({ confirmation, fileType, originalFileName, stored, title }) =>
+          repo.createDocument({
+            ...confirmation,
+            title,
+            importance: confirmation.importance ?? DEFAULT_IMPORTANCE,
+            fileType,
+            originalFileName,
+            storedFileName: stored.storedFileName,
+            storedFilePath: stored.relativePath,
+          }),
+        ),
+      )
+    } catch (error) {
+      await Promise.all(
+        copiedFiles.map((copiedFile) => rm(copiedFile, { force: true }).catch(() => {})),
+      )
+      throw error
+    }
   }
 
   return {
