@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Literature Manager Layout</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      color: #222;
+      background: #f5f6f8;
+    }
+    .page {
+      padding: 28px 34px 38px;
+      max-width: 1540px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+    .intro {
+      margin: 0 0 24px;
+      color: #626874;
+      font-size: 18px;
+    }
+    .screens {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    .screen {
+      background: #fff;
+      border: 2px solid #d8dce3;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 10px 28px rgba(20, 28, 42, .08);
+    }
+    .screen-title {
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: #242a33;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      color: #d7dce6;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .tab-active {
+      background: #eef3ff;
+      color: #1f5fd6;
+      border-radius: 4px;
+      padding: 5px 9px;
+    }
+    .app {
+      height: 520px;
+      display: grid;
+      background: #ffffff;
+    }
+    .library-grid {
+      grid-template-columns: 166px 1fr 210px;
+    }
+    .reader-grid {
+      grid-template-columns: 190px 1fr 230px;
+    }
+    .side {
+      border-right: 1px solid #e2e5ea;
+      background: #f8f9fb;
+      padding: 14px;
+      min-width: 0;
+    }
+    .main {
+      padding: 14px;
+      min-width: 0;
+    }
+    .detail {
+      border-left: 1px solid #e2e5ea;
+      background: #fbfcfe;
+      padding: 14px;
+      min-width: 0;
+    }
+    .label {
+      margin: 0 0 10px;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .folder, .filter, .paper-mini {
+      padding: 8px 10px;
+      margin-bottom: 7px;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.25;
+    }
+    .folder.active, .paper-mini.active {
+      background: #e9f0ff;
+      color: #1d55c7;
+      font-weight: 700;
+    }
+    .folder { background: #fff; border: 1px solid #e4e7ec; }
+    .filter { background: #edf0f4; color: #4b5563; }
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .search {
+      height: 34px;
+      border: 1px solid #cfd5df;
+      border-radius: 6px;
+      padding: 0 10px;
+      color: #667085;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      background: #fff;
+    }
+    .btn {
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 6px;
+      border: 1px solid #cfd5df;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #344054;
+      white-space: nowrap;
+    }
+    .btn.primary {
+      border-color: #246bfd;
+      background: #246bfd;
+      color: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 13px;
+    }
+    th {
+      height: 34px;
+      text-align: left;
+      color: #667085;
+      border-bottom: 1px solid #e2e5ea;
+      background: #f8f9fb;
+      padding: 0 8px;
+      font-weight: 800;
+    }
+    td {
+      height: 46px;
+      border-bottom: 1px solid #eceff3;
+      padding: 0 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #2f3642;
+    }
+    tr.selected td {
+      background: #edf4ff;
+    }
+    .stars { color: #d69a00; letter-spacing: 1px; }
+    .tag {
+      display: inline-block;
+      padding: 3px 7px;
+      margin: 0 4px 5px 0;
+      border-radius: 999px;
+      background: #eef2f7;
+      color: #445066;
+      font-size: 12px;
+    }
+    .field {
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+    .field b {
+      display: block;
+      margin-bottom: 5px;
+      color: #111827;
+    }
+    .note-box {
+      min-height: 115px;
+      padding: 10px;
+      border: 1px solid #d8dce3;
+      border-radius: 6px;
+      background: #fff;
+      color: #667085;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .paper-mini {
+      background: #fff;
+      border: 1px solid #e4e7ec;
+    }
+    .paper-mini small {
+      display: block;
+      margin-top: 3px;
+      color: #7a8290;
+    }
+    .pdf {
+      height: 492px;
+      border: 1px solid #d4d8df;
+      border-radius: 6px;
+      background: linear-gradient(#ffffff, #ffffff), #fff;
+      padding: 28px 38px;
+      overflow: hidden;
+    }
+    .pdf-title {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.25;
+      margin-bottom: 18px;
+    }
+    .pdf-line {
+      height: 10px;
+      background: #d9dee7;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+    .pdf-line.short { width: 64%; }
+    .pdf-line.mid { width: 82%; }
+    .pdf-section {
+      margin: 24px 0 12px;
+      font-size: 15px;
+      font-weight: 800;
+    }
+    .read-tools {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .summary {
+      padding: 11px;
+      border-radius: 6px;
+      background: #f1f5ff;
+      color: #31466f;
+      line-height: 1.45;
+      font-size: 13px;
+    }
+    .caption {
+      margin-top: 12px;
+      color: #5f6775;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    @media (max-width: 1050px) {
+      .screens { grid-template-columns: 1fr; }
+      .app { height: auto; min-height: 480px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>推荐方案：双模式文献管理器</h1>
+    <p class="intro">日常整理时用“文献库模式”，认真阅读时切到“阅读模式”。先不做 AI，重点把收纳、分类、标注重要程度、浏览和备份做好。</p>
+
+    <div class="screens">
+      <section class="screen">
+        <div class="screen-title">
+          <span>文献库模式：整理、筛选、批量管理</span>
+          <span class="tabs"><span class="tab-active">文献库</span><span>阅读</span></span>
+        </div>
+        <div class="app library-grid">
+          <aside class="side">
+            <p class="label">分类</p>
+            <div class="folder active">全部文献</div>
+            <div class="folder">深度学习</div>
+            <div class="folder">医学影像</div>
+            <div class="folder">综述论文</div>
+            <p class="label" style="margin-top:18px">快速筛选</p>
+            <div class="filter">五星重点</div>
+            <div class="filter">待读</div>
+            <div class="filter">本周导入</div>
+          </aside>
+
+          <main class="main">
+            <div class="toolbar">
+              <div class="search">搜索标题、作者、标签、备注</div>
+              <div class="btn">导出备份包</div>
+              <div class="btn primary">导入文献</div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:36%">标题</th>
+                  <th style="width:18%">作者</th>
+                  <th style="width:10%">年份</th>
+                  <th style="width:16%">分类</th>
+                  <th style="width:11%">重要</th>
+                  <th style="width:9%">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="selected">
+                  <td>Attention Is All You Need</td>
+                  <td>Vaswani</td>
+                  <td>2017</td>
+                  <td>深度学习</td>
+                  <td class="stars">★★★★★</td>
+                  <td>精读</td>
+                </tr>
+                <tr>
+                  <td>U-Net: Biomedical Image Segmentation</td>
+                  <td>Ronneberger</td>
+                  <td>2015</td>
+                  <td>医学影像</td>
+                  <td class="stars">★★★★</td>
+                  <td>待读</td>
+                </tr>
+                <tr>
+                  <td>A Survey on Vision Transformers</td>
+                  <td>Khan</td>
+                  <td>2022</td>
+                  <td>综述论文</td>
+                  <td class="stars">★★★</td>
+                  <td>已读</td>
+                </tr>
+                <tr>
+                  <td>Diffusion Models in Medical Imaging</td>
+                  <td>Multiple</td>
+                  <td>2024</td>
+                  <td>医学影像</td>
+                  <td class="stars">★★★★</td>
+                  <td>待读</td>
+                </tr>
+              </tbody>
+            </table>
+          </main>
+
+          <aside class="detail">
+            <p class="label">选中文献</p>
+            <div class="field"><b>重要程度</b><span class="stars">★★★★★</span></div>
+            <div class="field"><b>标签</b><span class="tag">Transformer</span><span class="tag">必读</span><span class="tag">方法</span></div>
+            <div class="field"><b>文件</b>PDF 已复制到资料库</div>
+            <div class="field"><b>备注</b><div class="note-box">重点看 self-attention 的结构，后续和 ViT 文献放在一起比较。</div></div>
+            <div class="btn primary" style="justify-content:center">打开阅读模式</div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-title">
+          <span>阅读模式：PDF 预览、元数据、读书笔记</span>
+          <span class="tabs"><span>文献库</span><span class="tab-active">阅读</span></span>
+        </div>
+        <div class="app reader-grid">
+          <aside class="side">
+            <p class="label">当前分类</p>
+            <div class="paper-mini active">Attention Is All You Need<small>★★★★★ · 精读</small></div>
+            <div class="paper-mini">U-Net<small>★★★★ · 待读</small></div>
+            <div class="paper-mini">Vision Transformers Survey<small>★★★ · 已读</small></div>
+            <p class="label" style="margin-top:18px">阅读操作</p>
+            <div class="btn" style="margin-bottom:8px">上一篇</div>
+            <div class="btn">下一篇</div>
+          </aside>
+
+          <main class="main">
+            <div class="pdf">
+              <div class="pdf-title">Attention Is All You Need</div>
+              <div class="pdf-line mid"></div>
+              <div class="pdf-line"></div>
+              <div class="pdf-line short"></div>
+              <div class="pdf-section">Abstract</div>
+              <div class="pdf-line"></div>
+              <div class="pdf-line mid"></div>
+              <div class="pdf-line"></div>
+              <div class="pdf-line short"></div>
+              <div class="pdf-section">1. Introduction</div>
+              <div class="pdf-line"></div>
+              <div class="pdf-line"></div>
+              <div class="pdf-line mid"></div>
+              <div class="pdf-line"></div>
+              <div class="pdf-line short"></div>
+            </div>
+          </main>
+
+          <aside class="detail">
+            <p class="label">文献信息</p>
+            <div class="field"><b>标题</b>Attention Is All You Need</div>
+            <div class="field"><b>作者 / 年份</b>Vaswani et al. / 2017</div>
+            <div class="field"><b>分类</b>深度学习</div>
+            <div class="field"><b>重要程度</b><span class="stars">★★★★★</span></div>
+            <div class="field"><b>标签</b><span class="tag">Transformer</span><span class="tag">NLP</span></div>
+            <div class="read-tools">
+              <div class="btn">标为已读</div>
+              <div class="btn">收藏</div>
+            </div>
+            <div class="field"><b>阅读笔记</b><div class="note-box">记录自己的理解、疑问、复现实验线索。以后 AI 总结可以放在这个区域下面。</div></div>
+            <div class="summary">预留 AI 区域：翻译、总结、问答以后可以加，不影响第一版文献管理功能。</div>
+          </aside>
+        </div>
+      </section>
+    </div>
+
+    <p class="caption">请看这个版本是否清楚：左边负责“管文献”，右边负责“读文献”。如果你觉得方向对，我会基于这个继续写设计方案。</p>
+  </div>
+</body>
+</html>
