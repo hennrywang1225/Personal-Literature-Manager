@@ -116,4 +116,45 @@ describe('createDocumentRepository', () => {
       expect(repo.getDocument(document.id)).toEqual(updated)
     })
   })
+
+  it('rolls back document and tag writes when tag assignment fails', async () => {
+    await withRepository(async (repo, db) => {
+      db.exec(
+        `create trigger reject_blocked_tag_link
+         before insert on document_tags
+         when exists (
+           select 1 from tags
+           where tags.id = new.tag_id and tags.name = 'blocked'
+         )
+         begin
+           select raise(abort, 'blocked tag link');
+         end`,
+      )
+
+      expect(() =>
+        repo.createDocument({
+          sourcePath: 'C:/incoming/rollback.pdf',
+          title: 'Rollback Paper',
+          authors: 'Alice Zhang',
+          year: 2024,
+          doi: '',
+          venue: '',
+          categoryId: null,
+          tags: ['blocked'],
+          importance: 3,
+          readingStatus: 'To Read',
+          note: '',
+          fileType: 'pdf',
+          originalFileName: 'rollback.pdf',
+          storedFileName: 'doc-rollback.pdf',
+          storedFilePath: 'files/doc-rollback.pdf',
+        }),
+      ).toThrow(/blocked tag link/)
+
+      expect(repo.getSnapshot()).toMatchObject({
+        documents: [],
+        tags: [],
+      })
+    })
+  })
 })

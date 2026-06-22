@@ -24,10 +24,12 @@ export function resolveLibraryRoot(input: LibraryPathInput): string {
 }
 
 export function buildLibraryPaths(root: string): LibraryPaths {
+  const normalizedRoot = normalize(root)
+
   return {
-    root,
-    databasePath: normalize(join(root, 'library.db')),
-    filesDir: normalize(join(root, 'files')),
-    exportsDir: normalize(join(root, 'exports')),
+    root: normalizedRoot,
+    databasePath: normalize(join(normalizedRoot, 'library.db')),
+    filesDir: normalize(join(normalizedRoot, 'files')),
+    exportsDir: normalize(join(normalizedRoot, 'exports')),
   }
 }

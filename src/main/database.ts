@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import initSqlJs from 'sql.js'
 
@@ -36,7 +37,8 @@ export interface LibraryDatabase {
   raw: SqlJsDatabase
   exec(sql: string, params?: SqlParams): void
   select<T extends SqlRow = SqlRow>(sql: string, params?: SqlParams): T[]
-  save(): void
+  transaction<T>(fn: () => T): T
+  save(): Promise<void>
   close(): void
 }
 
@@ -66,13 +68,13 @@ create table if not exists documents (
   year integer,
   doi text not null,
   venue text not null,
-  file_type text not null,
+  file_type text not null check (file_type in ('pdf', 'doc', 'docx', 'txt', 'md')),
   original_file_name text not null,
   stored_file_name text not null,
   stored_file_path text not null,
   category_id text,
-  importance integer not null,
-  reading_status text not null,
+  importance integer not null check (importance between 1 and 5),
+  reading_status text not null check (reading_status in ('To Read', 'Reading', 'Read', 'Intensive')),
   note text not null,
   created_at text not null,
   updated_at text not null,
@@ -147,9 +149,21 @@ export async function openLibraryDatabase({
 
       return rows
     },
-    save() {
-      mkdirSync(dirname(databasePath), { recursive: true })
-      writeFileSync(databasePath, raw.export())
+    transaction<T>(fn: () => T): T {
+      raw.run('begin')
+
+      try {
+        const result = fn()
+        raw.run('commit')
+        return result
+      } catch (error) {
+        raw.run('rollback')
+        throw error
+      }
+    },
+    async save() {
+      await mkdir(dirname(databasePath), { recursive: true })
+      await writeFile(databasePath, raw.export())
     },
     close() {
       raw.close()

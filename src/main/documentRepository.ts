@@ -231,79 +231,83 @@ export function createDocumentRepository(db: LibraryDatabase) {
   }
 
   function createDocument(input: CreateDocumentInput): DocumentRecord {
-    const timestamp = nowIso()
-    const id = prefixedId('doc')
+    return db.transaction(() => {
+      const timestamp = nowIso()
+      const id = prefixedId('doc')
 
-    db.exec(
-      `insert into documents (
-        id, title, authors, year, doi, venue, file_type, original_file_name,
-        stored_file_name, stored_file_path, category_id, importance, reading_status,
-        note, created_at, updated_at, last_opened_at
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        input.title,
-        input.authors,
-        input.year,
-        input.doi,
-        input.venue,
-        input.fileType,
-        input.originalFileName,
-        input.storedFileName,
-        input.storedFilePath,
-        input.categoryId,
-        input.importance,
-        input.readingStatus,
-        input.note,
-        timestamp,
-        timestamp,
-        null,
-      ],
-    )
-    setDocumentTags(id, input.tags)
+      db.exec(
+        `insert into documents (
+          id, title, authors, year, doi, venue, file_type, original_file_name,
+          stored_file_name, stored_file_path, category_id, importance, reading_status,
+          note, created_at, updated_at, last_opened_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          input.title,
+          input.authors,
+          input.year,
+          input.doi,
+          input.venue,
+          input.fileType,
+          input.originalFileName,
+          input.storedFileName,
+          input.storedFilePath,
+          input.categoryId,
+          input.importance,
+          input.readingStatus,
+          input.note,
+          timestamp,
+          timestamp,
+          null,
+        ],
+      )
+      setDocumentTags(id, input.tags)
 
-    return getDocument(id)
+      return getDocument(id)
+    })
   }
 
   function updateDocument(id: string, patch: UpdateDocumentPatch): DocumentRecord {
     getDocument(id)
 
-    const fields: Array<[string, string | number | null]> = []
-    const map: Array<[keyof UpdateDocumentPatch, string]> = [
-      ['title', 'title'],
-      ['authors', 'authors'],
-      ['year', 'year'],
-      ['doi', 'doi'],
-      ['venue', 'venue'],
-      ['categoryId', 'category_id'],
-      ['importance', 'importance'],
-      ['readingStatus', 'reading_status'],
-      ['note', 'note'],
-    ]
+    return db.transaction(() => {
+      const fields: Array<[string, string | number | null]> = []
+      const map: Array<[keyof UpdateDocumentPatch, string]> = [
+        ['title', 'title'],
+        ['authors', 'authors'],
+        ['year', 'year'],
+        ['doi', 'doi'],
+        ['venue', 'venue'],
+        ['categoryId', 'category_id'],
+        ['importance', 'importance'],
+        ['readingStatus', 'reading_status'],
+        ['note', 'note'],
+      ]
 
-    for (const [key, column] of map) {
-      if (key in patch) {
-        fields.push([column, patch[key] as string | number | null])
+      for (const [key, column] of map) {
+        if (key in patch) {
+          fields.push([column, patch[key] as string | number | null])
+        }
       }
-    }
 
-    if (fields.length > 0) {
-      const timestamp = nowIso()
+      if (fields.length > 0) {
+        const timestamp = nowIso()
 
-      db.exec(
-        `update documents
-         set ${fields.map(([column]) => `${column} = ?`).join(', ')}, updated_at = ?
-         where id = ?`,
-        [...fields.map(([, value]) => value), timestamp, id],
-      )
-    }
+        db.exec(
+          `update documents
+           set ${fields.map(([column]) => `${column} = ?`).join(', ')}, updated_at = ?
+           where id = ?`,
+          [...fields.map(([, value]) => value), timestamp, id],
+        )
+      }
 
-    if (patch.tags) {
-      setDocumentTags(id, patch.tags)
-      db.exec('update documents set updated_at = ? where id = ?', [nowIso(), id])
-    }
+      if (patch.tags) {
+        setDocumentTags(id, patch.tags)
+        db.exec('update documents set updated_at = ? where id = ?', [nowIso(), id])
+      }
 
-    return getDocument(id)
+      return getDocument(id)
+    })
   }
 
   function getSnapshot(): LibrarySnapshot {

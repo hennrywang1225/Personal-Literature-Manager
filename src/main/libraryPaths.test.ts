@@ -26,7 +26,7 @@ describe('resolveLibraryRoot', () => {
 describe('buildLibraryPaths', () => {
   it('returns database, files, and exports paths under the library root', () => {
     expect(buildLibraryPaths('D:/Tools/LitManager/LiteratureLibrary')).toEqual({
-      root: 'D:/Tools/LitManager/LiteratureLibrary',
+      root: 'D:\\Tools\\LitManager\\LiteratureLibrary',
       databasePath: 'D:\\Tools\\LitManager\\LiteratureLibrary\\library.db',
       filesDir: 'D:\\Tools\\LitManager\\LiteratureLibrary\\files',
       exportsDir: 'D:\\Tools\\LitManager\\LiteratureLibrary\\exports',
