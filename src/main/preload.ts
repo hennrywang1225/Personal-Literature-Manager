@@ -29,9 +29,9 @@ export interface LiteratureApi {
   updateDocument(id: string, patch: UpdateDocumentPatch): Promise<DocumentRecord>
   getFileUrl(documentId: string): Promise<string>
   openExternal(documentId: string): Promise<string>
-  exportSelection(ids: string[]): Promise<unknown>
+  exportSelection(documentIds: string[]): Promise<string>
   exportCategory(categoryId: string | null): Promise<string>
-  exportAll(): Promise<unknown>
+  exportAll(): Promise<string>
 }
 
 const literatureApi: LiteratureApi = {
@@ -44,10 +44,11 @@ const literatureApi: LiteratureApi = {
   getFileUrl: (documentId) => ipcRenderer.invoke('library:getFileUrl', documentId),
   openExternal: (documentId) =>
     ipcRenderer.invoke('library:openExternal', documentId),
-  exportSelection: (ids) => ipcRenderer.invoke('library:exportSelection', ids),
+  exportSelection: (documentIds) =>
+    ipcRenderer.invoke('library:exportSelection', documentIds) as Promise<string>,
   exportCategory: (categoryId) =>
-    ipcRenderer.invoke('library:exportCategory', categoryId),
-  exportAll: () => ipcRenderer.invoke('library:exportAll'),
+    ipcRenderer.invoke('library:exportCategory', categoryId) as Promise<string>,
+  exportAll: () => ipcRenderer.invoke('library:exportAll') as Promise<string>,
 }
 
 contextBridge.exposeInMainWorld('literature', literatureApi)

@@ -32,9 +32,9 @@ export interface RegisterIpcHandlersOptions {
   saveDatabase: () => Promise<void>
   getFileUrl: (documentId: string) => string | Promise<string>
   openExternal: (documentId: string) => string | Promise<string>
-  exportSelection: (ids: string[]) => unknown | Promise<unknown>
+  exportSelection: (ids: string[]) => Promise<string>
   exportCategory: (categoryId: string | null) => Promise<string>
-  exportAll: () => unknown | Promise<unknown>
+  exportAll: () => Promise<string>
 }
 
 const importFilters = [
