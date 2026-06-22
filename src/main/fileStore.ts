@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { access, copyFile, mkdir } from 'node:fs/promises'
-import { extname, join, normalize } from 'node:path'
+import { extname, join, normalize, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { FileType } from '../shared/types'
 
@@ -40,6 +40,33 @@ export function detectFileType(fileName: string): FileType {
   return fileType
 }
 
+function safeOriginalExtension(fileName: string): string {
+  detectFileType(fileName)
+  return extname(fileName).toLowerCase()
+}
+
+function assertSafeDocumentId(documentId: string) {
+  if (!/^[A-Za-z0-9_-]+$/.test(documentId)) {
+    throw new Error(
+      `Invalid documentId: ${documentId}. Use only letters, numbers, underscores, and hyphens.`,
+    )
+  }
+}
+
+function assertPathInsideFilesDir(filesDir: string, absolutePath: string) {
+  const resolvedFilesDir = resolve(filesDir)
+  const resolvedPath = resolve(absolutePath)
+  const pathFromFilesDir = relative(resolvedFilesDir, resolvedPath)
+
+  if (
+    pathFromFilesDir.startsWith('..') ||
+    pathFromFilesDir === '' ||
+    /^[A-Za-z]:/.test(pathFromFilesDir)
+  ) {
+    throw new Error(`Stored file path escapes filesDir: ${absolutePath}`)
+  }
+}
+
 export function createFileStore({ filesDir }: { filesDir: string }): FileStore {
   const normalizedFilesDir = normalize(filesDir)
 
@@ -48,9 +75,11 @@ export function createFileStore({ filesDir }: { filesDir: string }): FileStore {
       await access(sourcePath, constants.R_OK)
       await mkdir(normalizedFilesDir, { recursive: true })
 
-      const fileType = detectFileType(originalFileName)
-      const storedFileName = `${documentId}.${fileType}`
+      assertSafeDocumentId(documentId)
+
+      const storedFileName = `${documentId}${safeOriginalExtension(originalFileName)}`
       const absolutePath = normalize(join(normalizedFilesDir, storedFileName))
+      assertPathInsideFilesDir(normalizedFilesDir, absolutePath)
 
       await copyFile(sourcePath, absolutePath)
 

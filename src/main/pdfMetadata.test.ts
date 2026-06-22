@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest'
-import { deriveMetadataFromPdfSignals } from './pdfMetadata'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { deriveMetadataFromPdfSignals, extractPdfMetadata } from './pdfMetadata'
+
+const getDocumentMock = vi.hoisted(() => vi.fn())
+
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+  getDocument: getDocumentMock,
+}))
 
 describe('deriveMetadataFromPdfSignals', () => {
   it('prefers embedded metadata and detects DOI/year from first-page text', () => {
@@ -34,5 +43,53 @@ describe('deriveMetadataFromPdfSignals', () => {
       detectedVenue: '',
       extractionStatus: 'fallback',
     })
+  })
+
+  it('uses a conservative first-page title before falling back to file name', () => {
+    expect(
+      deriveMetadataFromPdfSignals({
+        fileName: 'fallback-title.pdf',
+        embeddedTitle: '   ',
+        firstPageText: `
+          Graph Neural Networks for Clinical Triage
+
+          Alice Zhang and Bo Wang
+          Published in 2023
+        `,
+      }),
+    ).toMatchObject({
+      detectedTitle: 'Graph Neural Networks for Clinical Triage',
+      detectedYear: 2023,
+      extractionStatus: 'detected',
+    })
+  })
+})
+
+describe('extractPdfMetadata', () => {
+  it('returns filename fallback metadata when pdf.js extraction fails', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'literature-manager-pdf-'))
+    const sourcePath = join(tempDir, 'broken.pdf')
+    writeFileSync(sourcePath, '%PDF-broken')
+    getDocumentMock.mockReturnValueOnce({
+      promise: Promise.resolve({
+        getMetadata: vi.fn().mockRejectedValue(new Error('metadata failed')),
+        destroy: vi.fn(),
+      }),
+    })
+
+    try {
+      await expect(
+        extractPdfMetadata(sourcePath, 'broken-paper.pdf'),
+      ).resolves.toEqual({
+        detectedTitle: 'broken paper',
+        detectedAuthors: '',
+        detectedYear: null,
+        detectedDoi: '',
+        detectedVenue: '',
+        extractionStatus: 'fallback',
+      })
+    } finally {
+      rmSync(tempDir, { force: true, recursive: true })
+    }
   })
 })
