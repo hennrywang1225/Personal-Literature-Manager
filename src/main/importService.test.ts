@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openLibraryDatabase, type LibraryDatabase } from './database'
 import { createDocumentRepository } from './documentRepository'
@@ -95,7 +95,8 @@ describe('createImportService', () => {
         originalFileName: 'sample.txt',
       })
       expect(imported[0].storedFileName).toMatch(/\.txt$/)
-      expect(existsSync(imported[0].storedFilePath)).toBe(true)
+      expect(imported[0].storedFilePath).toBe(`files/${imported[0].storedFileName}`)
+      expect(isAbsolute(imported[0].storedFilePath)).toBe(false)
     })
   })
 })

@@ -30,7 +30,7 @@ export interface LiteratureApi {
   getFileUrl(documentId: string): Promise<string>
   openExternal(documentId: string): Promise<string>
   exportSelection(ids: string[]): Promise<unknown>
-  exportCategory(categoryId: string): Promise<unknown>
+  exportCategory(categoryId: string | null): Promise<string>
   exportAll(): Promise<unknown>
 }
 

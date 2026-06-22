@@ -112,7 +112,7 @@ export function createImportService({
           fileType,
           originalFileName,
           storedFileName: stored.storedFileName,
-          storedFilePath: stored.absolutePath,
+          storedFilePath: stored.relativePath,
         }),
       )
     }

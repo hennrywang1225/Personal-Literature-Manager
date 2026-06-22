@@ -33,7 +33,7 @@ export interface RegisterIpcHandlersOptions {
   getFileUrl: (documentId: string) => string | Promise<string>
   openExternal: (documentId: string) => string | Promise<string>
   exportSelection: (ids: string[]) => unknown | Promise<unknown>
-  exportCategory: (categoryId: string) => unknown | Promise<unknown>
+  exportCategory: (categoryId: string | null) => Promise<string>
   exportAll: () => unknown | Promise<unknown>
 }
 
@@ -92,7 +92,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     return options.exportSelection(ids)
   })
 
-  ipcMain.handle('library:exportCategory', (_event, categoryId: string) => {
+  ipcMain.handle('library:exportCategory', (_event, categoryId: string | null) => {
     return options.exportCategory(categoryId)
   })
 
