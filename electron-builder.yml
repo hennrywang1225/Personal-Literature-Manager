@@ -1,0 +1,15 @@
+appId: com.local.literaturemanager
+productName: Literature Manager
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+asar: true
+win:
+  target:
+    - nsis
+    - portable
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
