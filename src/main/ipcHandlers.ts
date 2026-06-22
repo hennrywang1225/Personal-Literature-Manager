@@ -74,7 +74,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   ipcMain.handle(
     'library:updateDocument',
     async (_event, id: string, patch: UpdateDocumentPatch): Promise<DocumentRecord> => {
-      const updated = options.repo.updateDocument(id, patch)
+      const updated = await options.repo.updateDocument(id, patch)
       await options.saveDatabase()
       return updated
     },
