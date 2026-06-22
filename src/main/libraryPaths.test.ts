@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveLibraryRoot } from './libraryPaths'
+import { buildLibraryPaths, resolveLibraryRoot } from './libraryPaths'
 
 describe('resolveLibraryRoot', () => {
   it('uses AppData for installed builds', () => {
@@ -20,5 +20,16 @@ describe('resolveLibraryRoot', () => {
         exeDir: 'D:/Tools/LitManager',
       }),
     ).toBe('D:\\Tools\\LitManager\\LiteratureLibrary')
+  })
+})
+
+describe('buildLibraryPaths', () => {
+  it('returns database, files, and exports paths under the library root', () => {
+    expect(buildLibraryPaths('D:/Tools/LitManager/LiteratureLibrary')).toEqual({
+      root: 'D:/Tools/LitManager/LiteratureLibrary',
+      databasePath: 'D:\\Tools\\LitManager\\LiteratureLibrary\\library.db',
+      filesDir: 'D:\\Tools\\LitManager\\LiteratureLibrary\\files',
+      exportsDir: 'D:\\Tools\\LitManager\\LiteratureLibrary\\exports',
+    })
   })
 })

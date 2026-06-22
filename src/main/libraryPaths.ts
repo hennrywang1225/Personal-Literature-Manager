@@ -7,9 +7,10 @@ export interface LibraryPathInput {
 }
 
 export interface LibraryPaths {
-  libraryRoot: string
+  root: string
   databasePath: string
-  documentsDir: string
+  filesDir: string
+  exportsDir: string
 }
 
 export function resolveLibraryRoot(input: LibraryPathInput): string {
@@ -22,12 +23,11 @@ export function resolveLibraryRoot(input: LibraryPathInput): string {
   return normalize(join(input.exeDir, 'LiteratureLibrary'))
 }
 
-export function buildLibraryPaths(input: LibraryPathInput): LibraryPaths {
-  const libraryRoot = resolveLibraryRoot(input)
-
+export function buildLibraryPaths(root: string): LibraryPaths {
   return {
-    libraryRoot,
-    databasePath: normalize(join(libraryRoot, 'library.db')),
-    documentsDir: normalize(join(libraryRoot, 'documents')),
+    root,
+    databasePath: normalize(join(root, 'library.db')),
+    filesDir: normalize(join(root, 'files')),
+    exportsDir: normalize(join(root, 'exports')),
   }
 }
