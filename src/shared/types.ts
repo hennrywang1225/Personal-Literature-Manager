@@ -14,11 +14,11 @@ export type DocumentSortKey =
   | 'updatedAt'
   | 'lastOpenedAt'
 
-export type ImportanceLevel = 1 | 2 | 3 | 4 | 5
-
 export interface CategoryRecord {
   id: string
   name: string
+  parentId: string | null
+  sortOrder: number
   createdAt: string
   updatedAt: string
 }
@@ -26,6 +26,7 @@ export interface CategoryRecord {
 export interface TagRecord {
   id: string
   name: string
+  color: string
   createdAt: string
   updatedAt: string
 }
@@ -33,10 +34,10 @@ export interface TagRecord {
 export interface DocumentRecord {
   id: string
   title: string
-  authors: string[]
+  authors: string
   year: number | null
-  doi: string | null
-  venue: string | null
+  doi: string
+  venue: string
   fileType: FileType
   originalFileName: string
   storedFileName: string
@@ -44,9 +45,9 @@ export interface DocumentRecord {
   categoryId: string | null
   categoryName: string | null
   tags: string[]
-  importance: ImportanceLevel
+  importance: 1 | 2 | 3 | 4 | 5
   readingStatus: ReadingStatus
-  note: string | null
+  note: string
   createdAt: string
   updatedAt: string
   lastOpenedAt: string | null
@@ -58,39 +59,39 @@ export interface DocumentFilters {
   tag?: string
   fileType?: FileType
   status?: ReadingStatus
-  minImportance?: ImportanceLevel
+  minImportance?: 1 | 2 | 3 | 4 | 5
   sortBy: DocumentSortKey
   sortDirection: SortDirection
 }
 
 export interface ImportCandidate {
-  id: string
-  filePath: string
+  sourcePath: string
   originalFileName: string
   fileType: FileType
-  title: string
-  authors: string[]
-  year: number | null
-  doi: string | null
+  detectedTitle: string
+  detectedAuthors: string
+  detectedYear: number | null
+  detectedDoi: string
+  detectedVenue: string
+  extractionStatus: 'detected' | 'fallback'
 }
 
 export interface ImportConfirmation {
-  candidateId: string
+  sourcePath: string
   title: string
-  authors: string[]
+  authors: string
   year: number | null
-  doi: string | null
-  venue: string | null
+  doi: string
+  venue: string
   categoryId: string | null
   tags: string[]
-  importance: ImportanceLevel
+  importance: 1 | 2 | 3 | 4 | 5
   readingStatus: ReadingStatus
-  note: string | null
+  note: string
 }
 
 export interface LibrarySnapshot {
   documents: DocumentRecord[]
   categories: CategoryRecord[]
   tags: TagRecord[]
-  exportedAt: string
 }

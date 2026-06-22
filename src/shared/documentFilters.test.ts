@@ -6,7 +6,7 @@ const documents: DocumentRecord[] = [
   {
     id: 'doc-a',
     title: 'Transformer Segmentation for Medical Imaging',
-    authors: ['Alice Zhang', 'Bo Wang'],
+    authors: 'Alice Zhang; Bo Wang',
     year: 2024,
     doi: '10.1000/med-transformer',
     venue: 'MICCAI',
@@ -27,7 +27,7 @@ const documents: DocumentRecord[] = [
   {
     id: 'doc-b',
     title: 'Clinical Workflow Notes',
-    authors: ['Chen Li'],
+    authors: 'Chen Li',
     year: 2022,
     doi: '10.2000/clinical-notes',
     venue: 'Radiology Today',

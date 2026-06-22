@@ -1,6 +1,8 @@
 import type { DocumentFilters, DocumentRecord, DocumentSortKey } from './types'
 
-const normalizeSearchValue = (value: string | number | null | string[]) => {
+type FilterValue = string | number | null
+
+const normalizeSearchValue = (value: FilterValue | string[]) => {
   if (Array.isArray(value)) {
     return value.join(' ')
   }
@@ -26,12 +28,9 @@ const getSearchText = (document: DocumentRecord) =>
 const getSortValue = (
   document: DocumentRecord,
   sortBy: DocumentSortKey,
-): string | number | string[] | null => document[sortBy]
+): FilterValue => document[sortBy]
 
-const compareValues = (
-  left: string | number | string[] | null,
-  right: string | number | string[] | null,
-) => {
+const compareValues = (left: FilterValue, right: FilterValue) => {
   const normalizedLeft = normalizeSearchValue(left)
   const normalizedRight = normalizeSearchValue(right)
 
