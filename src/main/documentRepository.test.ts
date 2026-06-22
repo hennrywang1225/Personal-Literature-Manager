@@ -157,4 +157,52 @@ describe('createDocumentRepository', () => {
       })
     })
   })
+
+  it('rolls back document field updates and tag replacement together', async () => {
+    await withRepository(async (repo, db) => {
+      const document = repo.createDocument({
+        sourcePath: 'C:/incoming/update-rollback.pdf',
+        title: 'Original',
+        authors: 'Alice Zhang',
+        year: 2024,
+        doi: '',
+        venue: '',
+        categoryId: null,
+        tags: ['safe'],
+        importance: 3,
+        readingStatus: 'To Read',
+        note: 'Before',
+        fileType: 'pdf',
+        originalFileName: 'update-rollback.pdf',
+        storedFileName: 'doc-update-rollback.pdf',
+        storedFilePath: 'files/doc-update-rollback.pdf',
+      })
+
+      db.exec(
+        `create trigger reject_blocked_tag_link
+         before insert on document_tags
+         when exists (
+           select 1 from tags
+           where tags.id = new.tag_id and tags.name = 'blocked'
+         )
+         begin
+           select raise(abort, 'blocked tag link');
+         end`,
+      )
+
+      expect(() =>
+        repo.updateDocument(document.id, {
+          title: 'Changed',
+          note: 'After',
+          tags: ['blocked'],
+        }),
+      ).toThrow(/blocked tag link/)
+
+      expect(repo.getDocument(document.id)).toMatchObject({
+        title: 'Original',
+        note: 'Before',
+        tags: ['safe'],
+      })
+    })
+  })
 })
