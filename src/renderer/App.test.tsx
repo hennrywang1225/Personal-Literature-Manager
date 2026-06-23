@@ -8,7 +8,7 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LibrarySnapshot } from '../shared/types'
+import type { DocumentRecord, LibrarySnapshot } from '../shared/types'
 import { App } from './App'
 
 const snapshot: LibrarySnapshot = {
@@ -20,6 +20,7 @@ const snapshot: LibrarySnapshot = {
 const apiMocks = vi.hoisted(() => ({
   getSnapshot: vi.fn<() => Promise<LibrarySnapshot>>(),
   chooseImportFiles: vi.fn<() => Promise<unknown[]>>(),
+  confirmImports: vi.fn<() => Promise<DocumentRecord[]>>(),
   updateDocument: vi.fn(),
   exportAll: vi.fn(),
 }))
@@ -28,6 +29,7 @@ vi.mock('./api/client', () => ({
   libraryApi: {
     getSnapshot: apiMocks.getSnapshot,
     chooseImportFiles: apiMocks.chooseImportFiles,
+    confirmImports: apiMocks.confirmImports,
     updateDocument: apiMocks.updateDocument,
     exportAll: apiMocks.exportAll,
   },
@@ -51,17 +53,67 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: '文献库' })).toBeInTheDocument()
   })
 
-  it('keeps import as a placeholder until confirmation UI exists', async () => {
-    apiMocks.getSnapshot.mockResolvedValue(snapshot)
+  it('imports reviewed files and refreshes the library', async () => {
+    const importedDocument: DocumentRecord = {
+      id: 'doc-1',
+      title: 'Edited Paper',
+      authors: 'Author',
+      year: 2026,
+      doi: '10.1000/example',
+      venue: '',
+      fileType: 'pdf',
+      originalFileName: 'paper.pdf',
+      storedFileName: 'doc-1.pdf',
+      storedFilePath: 'C:/library/doc-1.pdf',
+      categoryId: null,
+      categoryName: null,
+      tags: [],
+      importance: 3,
+      readingStatus: 'To Read',
+      note: '',
+      createdAt: '2026-06-23T00:00:00.000Z',
+      updatedAt: '2026-06-23T00:00:00.000Z',
+      lastOpenedAt: null,
+    }
+    apiMocks.getSnapshot
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce({
+        ...snapshot,
+        documents: [importedDocument],
+      })
+    apiMocks.chooseImportFiles.mockResolvedValue([
+      {
+        sourcePath: 'C:/paper.pdf',
+        originalFileName: 'paper.pdf',
+        fileType: 'pdf',
+        detectedTitle: 'Detected Paper',
+        detectedAuthors: 'Author',
+        detectedYear: 2026,
+        detectedDoi: '10.1000/example',
+        detectedVenue: '',
+        extractionStatus: 'detected',
+      },
+    ])
+    apiMocks.confirmImports.mockResolvedValue([importedDocument])
 
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: '导入文献' }))
+    fireEvent.change(await screen.findByLabelText('标题'), {
+      target: { value: 'Edited Paper' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存导入' }))
 
     await waitFor(() => {
-      expect(screen.getByText('导入确认窗口将在下一步实现。')).toBeInTheDocument()
+      expect(apiMocks.confirmImports).toHaveBeenCalledWith([
+        expect.objectContaining({
+          sourcePath: 'C:/paper.pdf',
+          title: 'Edited Paper',
+          readingStatus: 'To Read',
+        }),
+      ])
     })
-    expect(apiMocks.chooseImportFiles).not.toHaveBeenCalled()
-    expect(apiMocks.getSnapshot).toHaveBeenCalledTimes(1)
+    expect(apiMocks.getSnapshot).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('已导入 1 篇文献。')).toBeInTheDocument()
   })
 })

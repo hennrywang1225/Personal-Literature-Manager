@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { DocumentRecord, LibrarySnapshot } from '../shared/types'
+import type {
+  DocumentRecord,
+  ImportCandidate,
+  ImportConfirmation,
+  LibrarySnapshot,
+} from '../shared/types'
 import { libraryApi } from './api/client'
 import { AppShell } from './components/AppShell'
+import { ImportReviewDialog } from './components/ImportReviewDialog'
 import { LibraryView } from './components/LibraryView'
 
 type Mode = 'library' | 'reader'
@@ -35,6 +41,9 @@ export function App(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [importCandidates, setImportCandidates] = useState<ImportCandidate[]>(
+    [],
+  )
 
   useEffect(() => {
     let isMounted = true
@@ -81,8 +90,43 @@ export function App(): JSX.Element {
     }))
   }
 
-  const handleImport = () => {
-    setStatusMessage('导入确认窗口将在下一步实现。')
+  const handleImport = async () => {
+    try {
+      setErrorMessage(null)
+      const candidates = await libraryApi.chooseImportFiles()
+
+      if (candidates.length === 0) {
+        setStatusMessage('已取消导入。')
+        return
+      }
+
+      setStatusMessage(null)
+      setImportCandidates(candidates)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '导入失败')
+    }
+  }
+
+  const handleConfirmImport = async (confirmations: ImportConfirmation[]) => {
+    try {
+      setErrorMessage(null)
+      const importedDocuments = await libraryApi.confirmImports(confirmations)
+      const nextSnapshot = await libraryApi.getSnapshot()
+
+      setSnapshot(nextSnapshot)
+      setSelectedDocumentId(
+        importedDocuments[0]?.id ?? nextSnapshot.documents[0]?.id ?? null,
+      )
+      setImportCandidates([])
+      setStatusMessage(`已导入 ${importedDocuments.length} 篇文献。`)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '保存导入失败')
+    }
+  }
+
+  const handleCancelImport = () => {
+    setImportCandidates([])
+    setStatusMessage('已取消导入。')
   }
 
   const handleExportAll = async () => {
@@ -106,6 +150,13 @@ export function App(): JSX.Element {
           onUpdateDocument={handleUpdateDocument}
           selectedDocumentId={selectedDocumentId}
           snapshot={snapshot}
+        />
+      ) : null}
+      {importCandidates.length > 0 ? (
+        <ImportReviewDialog
+          candidates={importCandidates}
+          onCancel={handleCancelImport}
+          onConfirm={handleConfirmImport}
         />
       ) : null}
       {!isLoading && mode === 'reader' ? (

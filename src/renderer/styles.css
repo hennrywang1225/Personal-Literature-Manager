@@ -402,6 +402,132 @@ button {
   line-height: 1.6;
 }
 
+.modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 32, 51, 0.42);
+  padding: 28px;
+}
+
+.import-review-dialog {
+  display: flex;
+  width: min(820px, 100%);
+  max-height: min(680px, calc(100vh - 56px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 22px 70px rgba(23, 32, 51, 0.26);
+}
+
+.import-review-header,
+.import-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: #e3e8ef;
+  padding: 14px 16px;
+}
+
+.import-review-header {
+  border-bottom: 1px solid #e3e8ef;
+}
+
+.import-review-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.import-review-header p {
+  margin: 4px 0 0;
+  color: #607086;
+  font-size: 13px;
+}
+
+.import-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  padding: 14px 16px;
+}
+
+.import-review-item {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #d7dde8;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.import-review-item legend {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  color: #253246;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.import-review-item legend span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-review-item legend span:last-child {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #526173;
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.import-review-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.8fr) 96px minmax(160px, 0.8fr);
+  gap: 10px;
+}
+
+.import-review-grid label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  color: #526173;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.import-review-grid input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  padding: 8px 9px;
+}
+
+.import-review-grid input:focus {
+  border-color: #1f5f8f;
+  box-shadow: 0 0 0 3px rgba(31, 95, 143, 0.16);
+  outline: 0;
+}
+
+.import-review-actions {
+  justify-content: flex-end;
+  border-top: 1px solid #e3e8ef;
+}
+
 @media (max-width: 1050px) {
   .topbar,
   .library-toolbar {
@@ -433,5 +559,18 @@ button {
 
   .search-field {
     max-width: none;
+  }
+
+  .modal-backdrop {
+    align-items: stretch;
+    padding: 14px;
+  }
+
+  .import-review-dialog {
+    max-height: calc(100vh - 28px);
+  }
+
+  .import-review-grid {
+    grid-template-columns: 1fr;
   }
 }
