@@ -7,6 +7,7 @@ import { createFileStore } from './fileStore'
 import { createImportService } from './importService'
 import { registerIpcHandlers } from './ipcHandlers'
 import { buildLibraryPaths, resolveLibraryRoot } from './libraryPaths'
+import { resolveManagedFilePath } from './managedFilePath'
 import { extractPdfMetadata } from './pdfMetadata'
 
 const createWindow = (): BrowserWindow => {
@@ -46,6 +47,15 @@ app.whenReady().then(async () => {
   })
   const paths = buildLibraryPaths(root)
   const db = await openLibraryDatabase({ databasePath: paths.databasePath })
+  let databaseClosed = false
+
+  app.once('before-quit', () => {
+    if (!databaseClosed) {
+      databaseClosed = true
+      db.close()
+    }
+  })
+
   const repo = createDocumentRepository(db)
   const store = createFileStore({ filesDir: paths.filesDir })
   const importService = createImportService({ repo, store, extractPdfMetadata })
@@ -63,11 +73,25 @@ app.whenReady().then(async () => {
     saveDatabase: () => db.save(),
     getFileUrl(documentId) {
       const document = repo.getDocument(documentId)
-      return store.toFileUrl(join(root, document.storedFilePath))
+      return store.toFileUrl(
+        resolveManagedFilePath({
+          documentId: document.id,
+          libraryRoot: root,
+          filesDir: paths.filesDir,
+          storedFilePath: document.storedFilePath,
+        }),
+      )
     },
     openExternal(documentId) {
       const document = repo.getDocument(documentId)
-      return store.openExternal(join(root, document.storedFilePath))
+      return store.openExternal(
+        resolveManagedFilePath({
+          documentId: document.id,
+          libraryRoot: root,
+          filesDir: paths.filesDir,
+          storedFilePath: document.storedFilePath,
+        }),
+      )
     },
     exportSelection: exportService.exportSelection,
     exportCategory: exportService.exportCategory,
