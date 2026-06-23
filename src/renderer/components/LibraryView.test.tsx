@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LibrarySnapshot } from '../../shared/types'
 import { LibraryView } from './LibraryView'
 
@@ -50,6 +50,10 @@ const snapshot: LibrarySnapshot = {
   ],
 }
 
+afterEach(() => {
+  cleanup()
+})
+
 describe('LibraryView', () => {
   it('opens the selected document in reader mode', () => {
     const onOpenReader = vi.fn()
@@ -71,5 +75,21 @@ describe('LibraryView', () => {
     fireEvent.click(screen.getByRole('button', { name: '打开阅读模式' }))
 
     expect(onOpenReader).toHaveBeenCalledWith('doc-1')
+  })
+
+  it('names the search input for assistive technology', () => {
+    render(
+      <LibraryView
+        snapshot={snapshot}
+        selectedDocumentId="doc-1"
+        onSelectDocument={vi.fn()}
+        onOpenReader={vi.fn()}
+        onImport={vi.fn()}
+        onExportAll={vi.fn()}
+        onUpdateDocument={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('searchbox', { name: '搜索文献' })).toBeInTheDocument()
   })
 })

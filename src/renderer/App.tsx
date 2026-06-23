@@ -34,21 +34,7 @@ export function App(): JSX.Element {
   const [mode, setMode] = useState<Mode>('library')
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  const refreshSnapshot = async () => {
-    const nextSnapshot = await libraryApi.getSnapshot()
-    setSnapshot(nextSnapshot)
-    setSelectedDocumentId((currentId) => {
-      if (
-        currentId &&
-        nextSnapshot.documents.some((document) => document.id === currentId)
-      ) {
-        return currentId
-      }
-
-      return nextSnapshot.documents[0]?.id ?? null
-    })
-  }
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -95,9 +81,8 @@ export function App(): JSX.Element {
     }))
   }
 
-  const handleImport = async () => {
-    await libraryApi.chooseImportFiles()
-    await refreshSnapshot()
+  const handleImport = () => {
+    setStatusMessage('导入确认窗口将在下一步实现。')
   }
 
   const handleExportAll = async () => {
@@ -107,6 +92,7 @@ export function App(): JSX.Element {
   return (
     <AppShell mode={mode} onModeChange={setMode}>
       {errorMessage ? <p className="status-message">{errorMessage}</p> : null}
+      {statusMessage ? <p className="status-message">{statusMessage}</p> : null}
       {isLoading ? <p className="status-message">正在载入资料库...</p> : null}
       {!isLoading && mode === 'library' ? (
         <LibraryView

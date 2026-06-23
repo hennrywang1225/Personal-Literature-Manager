@@ -150,6 +150,7 @@ export function LibraryView({
           <label className="search-field">
             <Search aria-hidden="true" size={16} />
             <input
+              aria-label="搜索文献"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索标题、作者、标签、备注、DOI"
               type="search"
