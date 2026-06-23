@@ -9,8 +9,18 @@ import {
 import { tmpdir } from 'node:os'
 import { join, normalize } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFileStore, detectFileType } from './fileStore'
+
+const shellMocks = vi.hoisted(() => ({
+  openPath: vi.fn<(path: string) => Promise<string>>(),
+}))
+
+vi.mock('electron', () => ({
+  shell: {
+    openPath: shellMocks.openPath,
+  },
+}))
 
 const tempDirs: string[] = []
 
@@ -19,6 +29,10 @@ function makeTempDir() {
   tempDirs.push(tempDir)
   return tempDir
 }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
@@ -112,5 +126,18 @@ describe('createFileStore', () => {
     expect(
       createFileStore({ filesDir: 'C:/Library/files' }).toFileUrl(absolutePath),
     ).toBe(pathToFileURL(absolutePath).toString())
+  })
+
+  it('rejects when the operating system cannot open a file externally', async () => {
+    const absolutePath = normalize('C:/Library/files/doc-123.txt')
+    shellMocks.openPath.mockResolvedValue('没有关联的默认应用')
+
+    await expect(
+      createFileStore({ filesDir: 'C:/Library/files' }).openExternal(
+        absolutePath,
+      ),
+    ).rejects.toThrow('没有关联的默认应用')
+
+    expect(shellMocks.openPath).toHaveBeenCalledWith(absolutePath)
   })
 })

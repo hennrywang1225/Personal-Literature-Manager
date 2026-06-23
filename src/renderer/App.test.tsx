@@ -62,6 +62,15 @@ const apiMocks = vi.hoisted(() => ({
   exportAll: vi.fn(),
 }))
 
+const readerViewRenders = vi.hoisted(
+  () =>
+    [] as Array<{
+      selectedDocumentId: string | null
+      fileUrl: string | null
+      fileUrlError: string | null
+    }>,
+)
+
 vi.mock('./api/client', () => ({
   libraryApi: {
     getSnapshot: apiMocks.getSnapshot,
@@ -73,6 +82,23 @@ vi.mock('./api/client', () => ({
     exportAll: apiMocks.exportAll,
   },
 }))
+
+vi.mock('./components/ReaderView', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./components/ReaderView')>()
+
+  return {
+    ReaderView: (props: Parameters<typeof actual.ReaderView>[0]) => {
+      readerViewRenders.push({
+        fileUrl: props.fileUrl,
+        fileUrlError: props.fileUrlError,
+        selectedDocumentId: props.selectedDocumentId,
+      })
+
+      return <actual.ReaderView {...props} />
+    },
+  }
+})
 
 const textDocument: DocumentRecord = {
   ...importedDocument,
@@ -90,13 +116,40 @@ const textDocument: DocumentRecord = {
   note: '',
 }
 
+const secondPdfDocument: DocumentRecord = {
+  ...importedDocument,
+  id: 'doc-3',
+  title: 'Second PDF',
+  authors: 'Second Author',
+  originalFileName: 'second.pdf',
+  storedFileName: 'doc-3.pdf',
+  storedFilePath: 'C:/library/doc-3.pdf',
+}
+
 const readerSnapshot: LibrarySnapshot = {
   ...snapshot,
   documents: [importedDocument, textDocument],
 }
 
+const twoPdfSnapshot: LibrarySnapshot = {
+  ...snapshot,
+  documents: [importedDocument, secondPdfDocument],
+}
+
+function createDeferred<T>() {
+  let reject!: (error: unknown) => void
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+
+  return { promise, reject, resolve }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  readerViewRenders.length = 0
 })
 
 afterEach(() => {
@@ -196,7 +249,7 @@ describe('App', () => {
   it('clears the file URL for non-PDF selections and opens them externally', async () => {
     apiMocks.getSnapshot.mockResolvedValue(readerSnapshot)
     apiMocks.getFileUrl.mockResolvedValue('file:///C:/library/doc-1.pdf')
-    apiMocks.openExternal.mockResolvedValue('C:/library/doc-2.txt')
+    apiMocks.openExternal.mockResolvedValue('')
 
     render(<App />)
 
@@ -215,6 +268,105 @@ describe('App', () => {
     await waitFor(() => {
       expect(apiMocks.openExternal).toHaveBeenCalledWith('doc-2')
     })
+  })
+
+  it('does not render a stale PDF URL while switching between PDF documents', async () => {
+    const firstFileUrl = createDeferred<string>()
+    const secondFileUrl = createDeferred<string>()
+    apiMocks.getSnapshot.mockResolvedValue(twoPdfSnapshot)
+    apiMocks.getFileUrl.mockImplementation((documentId) =>
+      documentId === 'doc-1' ? firstFileUrl.promise : secondFileUrl.promise,
+    )
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开阅读模式' }))
+    await waitFor(() => {
+      expect(apiMocks.getFileUrl).toHaveBeenCalledWith('doc-1')
+    })
+
+    firstFileUrl.resolve('file:///C:/library/doc-1.pdf')
+    expect(await screen.findByTitle('PDF 预览：Edited Paper')).toHaveAttribute(
+      'src',
+      'file:///C:/library/doc-1.pdf',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Second PDF/ }))
+    await waitFor(() => {
+      expect(apiMocks.getFileUrl).toHaveBeenCalledWith('doc-3')
+    })
+
+    expect(readerViewRenders).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fileUrl: 'file:///C:/library/doc-1.pdf',
+          selectedDocumentId: 'doc-3',
+        }),
+      ]),
+    )
+    expect(screen.queryByTitle('PDF 预览：Second PDF')).not.toBeInTheDocument()
+
+    secondFileUrl.resolve('file:///C:/library/doc-3.pdf')
+    expect(await screen.findByTitle('PDF 预览：Second PDF')).toHaveAttribute(
+      'src',
+      'file:///C:/library/doc-3.pdf',
+    )
+  })
+
+  it('does not render a stale PDF error while switching between PDF documents', async () => {
+    const firstFileUrl = createDeferred<string>()
+    const secondFileUrl = createDeferred<string>()
+    apiMocks.getSnapshot.mockResolvedValue(twoPdfSnapshot)
+    apiMocks.getFileUrl.mockImplementation((documentId) =>
+      documentId === 'doc-1' ? firstFileUrl.promise : secondFileUrl.promise,
+    )
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开阅读模式' }))
+    await waitFor(() => {
+      expect(apiMocks.getFileUrl).toHaveBeenCalledWith('doc-1')
+    })
+
+    firstFileUrl.reject(new Error('A 文件无法预览'))
+    expect(await screen.findByText('A 文件无法预览')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Second PDF/ }))
+    await waitFor(() => {
+      expect(apiMocks.getFileUrl).toHaveBeenCalledWith('doc-3')
+    })
+
+    expect(readerViewRenders).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fileUrlError: 'A 文件无法预览',
+          selectedDocumentId: 'doc-3',
+        }),
+      ]),
+    )
+    expect(screen.queryByText('A 文件无法预览')).not.toBeInTheDocument()
+
+    secondFileUrl.resolve('file:///C:/library/doc-3.pdf')
+    expect(await screen.findByTitle('PDF 预览：Second PDF')).toHaveAttribute(
+      'src',
+      'file:///C:/library/doc-3.pdf',
+    )
+  })
+
+  it('shows a visible error when external open resolves an error message', async () => {
+    apiMocks.getSnapshot.mockResolvedValue(readerSnapshot)
+    apiMocks.getFileUrl.mockResolvedValue('file:///C:/library/doc-1.pdf')
+    apiMocks.openExternal.mockResolvedValue('没有关联的默认应用')
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开阅读模式' }))
+    expect(await screen.findByTitle('PDF 预览：Edited Paper')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Reading Notes/ }))
+    fireEvent.click(screen.getByRole('button', { name: '外部打开' }))
+
+    expect(await screen.findByText('没有关联的默认应用')).toBeInTheDocument()
   })
 
   it('shows a visible error when loading a PDF file URL fails', async () => {

@@ -96,7 +96,13 @@ export function createFileStore({ filesDir }: { filesDir: string }): FileStore {
 
     async openExternal(absolutePath) {
       const { shell } = await import('electron')
-      return shell.openPath(absolutePath)
+      const message = await shell.openPath(absolutePath)
+
+      if (message) {
+        throw new Error(message)
+      }
+
+      return ''
     },
   }
 }
