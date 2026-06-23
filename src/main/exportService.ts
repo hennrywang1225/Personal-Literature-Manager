@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import AdmZip from 'adm-zip'
 import { mkdir, readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import type { DocumentRecord, LibrarySnapshot } from '../shared/types'
 
 export interface CreateExportServiceOptions {
@@ -21,6 +22,14 @@ function dateStamp() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function timeStamp() {
+  return new Date().toISOString().slice(11, 19).replace(/:/g, '')
+}
+
+function shortId() {
+  return randomUUID().replace(/-/g, '').slice(0, 8)
+}
+
 function zipPathForStoredFile(storedFilePath: string) {
   return storedFilePath.replace(/\\/g, '/')
 }
@@ -39,24 +48,51 @@ function limitSnapshot(
   }
 }
 
-async function assertDocumentFilesExist(
-  libraryRoot: string,
-  documents: DocumentRecord[],
-) {
-  for (const document of documents) {
-    const absolutePath = join(libraryRoot, document.storedFilePath)
+function isInsideDirectory(parentPath: string, childPath: string) {
+  const relativePath = relative(parentPath, childPath)
+  return relativePath !== '' && !relativePath.startsWith('..') && !isAbsolute(relativePath)
+}
 
+function validateStoredFilePath(libraryRoot: string, document: DocumentRecord) {
+  const archivePath = zipPathForStoredFile(document.storedFilePath)
+  const archivePathSegments = archivePath.split('/')
+  const managedFilesDir = resolve(libraryRoot, 'files')
+  const absolutePath = resolve(libraryRoot, document.storedFilePath)
+
+  if (
+    isAbsolute(document.storedFilePath) ||
+    !archivePath.startsWith('files/') ||
+    archivePathSegments.includes('..') ||
+    !isInsideDirectory(managedFilesDir, absolutePath)
+  ) {
+    throw new Error(
+      `unsafe managed file path for document ${document.id}: ${archivePath}`,
+    )
+  }
+
+  return { absolutePath, archivePath }
+}
+
+async function validateDocumentFiles(libraryRoot: string, documents: DocumentRecord[]) {
+  const files = documents.map((document) => ({
+    document,
+    ...validateStoredFilePath(libraryRoot, document),
+  }))
+
+  for (const file of files) {
     try {
-      const fileStat = await stat(absolutePath)
+      const fileStat = await stat(file.absolutePath)
       if (!fileStat.isFile()) {
         throw new Error('not a file')
       }
     } catch {
       throw new Error(
-        `missing managed file for document ${document.id}: ${zipPathForStoredFile(document.storedFilePath)}`,
+        `missing managed file for document ${file.document.id}: ${file.archivePath}`,
       )
     }
   }
+
+  return files
 }
 
 export function createExportService({
@@ -71,7 +107,7 @@ export function createExportService({
   ) {
     const limitedSnapshot = limitSnapshot(snapshot, documents)
 
-    await assertDocumentFilesExist(libraryRoot, limitedSnapshot.documents)
+    const documentFiles = await validateDocumentFiles(libraryRoot, limitedSnapshot.documents)
     await mkdir(exportsDir, { recursive: true })
 
     const zip = new AdmZip()
@@ -80,12 +116,14 @@ export function createExportService({
       Buffer.from(JSON.stringify(limitedSnapshot, null, 2), 'utf8'),
     )
 
-    for (const document of limitedSnapshot.documents) {
-      const zipPath = zipPathForStoredFile(document.storedFilePath)
-      zip.addFile(zipPath, await readFile(join(libraryRoot, document.storedFilePath)))
+    for (const file of documentFiles) {
+      zip.addFile(file.archivePath, await readFile(file.absolutePath))
     }
 
-    const exportPath = join(exportsDir, `${exportFileNames[kind]}-${dateStamp()}.zip`)
+    const exportPath = join(
+      exportsDir,
+      `${exportFileNames[kind]}-${dateStamp()}-${timeStamp()}-${shortId()}.zip`,
+    )
     zip.writeZip(exportPath)
     return exportPath
   }

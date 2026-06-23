@@ -1,12 +1,13 @@
 import AdmZip from 'adm-zip'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DocumentRecord, LibrarySnapshot } from '../shared/types'
 import { createExportService } from './exportService'
 
 const tempDirs: string[] = []
+const tempFiles: string[] = []
 
 function makeTempRoot() {
   const root = mkdtempSync(join(tmpdir(), 'literature-manager-export-'))
@@ -17,6 +18,14 @@ function makeTempRoot() {
 }
 
 afterEach(() => {
+  for (const tempFile of tempFiles.splice(0)) {
+    try {
+      unlinkSync(tempFile)
+    } catch {
+      // Already removed.
+    }
+  }
+
   for (const tempDir of tempDirs.splice(0)) {
     rmSync(tempDir, { force: true, recursive: true })
   }
@@ -107,7 +116,7 @@ describe('createExportService', () => {
 
     const zipPath = await service.exportSelection(['doc-1'])
 
-    expect(zipPath).toMatch(/selected-documents-\d{4}-\d{2}-\d{2}\.zip$/)
+    expect(zipPath).toMatch(/selected-documents-\d{4}-\d{2}-\d{2}-\d{6}-[a-f0-9]{8}\.zip$/)
     const zip = new AdmZip(zipPath)
     expect(zip.getEntry('metadata.json')).toBeTruthy()
     expect(zip.getEntry('files/doc-1.pdf')).toBeTruthy()
@@ -142,7 +151,7 @@ describe('createExportService', () => {
 
     const zipPath = await service.exportCategory('cat-1')
 
-    expect(zipPath).toMatch(/category-documents-\d{4}-\d{2}-\d{2}\.zip$/)
+    expect(zipPath).toMatch(/category-documents-\d{4}-\d{2}-\d{2}-\d{6}-[a-f0-9]{8}\.zip$/)
     const zip = new AdmZip(zipPath)
     expect(zip.getEntry('files/doc-1.pdf')).toBeTruthy()
     expect(zip.getEntry('files/doc-2.pdf')).toBeNull()
@@ -176,7 +185,7 @@ describe('createExportService', () => {
 
     const zipPath = await service.exportAll()
 
-    expect(zipPath).toMatch(/all-documents-\d{4}-\d{2}-\d{2}\.zip$/)
+    expect(zipPath).toMatch(/all-documents-\d{4}-\d{2}-\d{2}-\d{6}-[a-f0-9]{8}\.zip$/)
     const zip = new AdmZip(zipPath)
     expect(zip.getEntry('files/doc-1.pdf')).toBeTruthy()
     expect(zip.getEntry('files/doc-2.pdf')).toBeTruthy()
@@ -196,6 +205,75 @@ describe('createExportService', () => {
 
     await expect(service.exportSelection(['doc-1'])).rejects.toThrow(
       /missing managed file for document doc-1: files\/doc-1\.pdf/,
+    )
+  })
+
+  it('rejects traversal paths before reading outside the managed files directory', async () => {
+    const root = makeTempRoot()
+    const outsideFilePath = resolve(root, '..', 'secret.txt')
+    tempFiles.push(outsideFilePath)
+    writeFileSync(outsideFilePath, 'secret')
+    const service = createExportService({
+      libraryRoot: root,
+      exportsDir: join(root, 'exports'),
+      getSnapshot: () => makeSnapshot([makeDocument({ storedFilePath: '../secret.txt' })]),
+    })
+
+    await expect(service.exportSelection(['doc-1'])).rejects.toThrow(
+      /unsafe managed file path for document doc-1: \.\.\/secret\.txt/,
+    )
+    expect(readdirSync(join(root, 'exports'))).toEqual([])
+  })
+
+  it('rejects absolute stored file paths', async () => {
+    const root = makeTempRoot()
+    const secretPath = resolve(root, '..', 'absolute-secret.pdf')
+    tempFiles.push(secretPath)
+    writeFileSync(secretPath, 'secret')
+    const service = createExportService({
+      libraryRoot: root,
+      exportsDir: join(root, 'exports'),
+      getSnapshot: () =>
+        makeSnapshot([makeDocument({ storedFilePath: secretPath.replace(/\\/g, '/') })]),
+    })
+
+    await expect(service.exportSelection(['doc-1'])).rejects.toThrow(
+      /unsafe managed file path for document doc-1:/,
+    )
+    expect(readdirSync(join(root, 'exports'))).toEqual([])
+  })
+
+  it('rejects files-prefix paths that traverse into exports', async () => {
+    const root = makeTempRoot()
+    writeFileSync(join(root, 'exports', 'foo.pdf'), 'not managed')
+    const service = createExportService({
+      libraryRoot: root,
+      exportsDir: join(root, 'exports'),
+      getSnapshot: () =>
+        makeSnapshot([makeDocument({ storedFilePath: 'files/../exports/foo.pdf' })]),
+    })
+
+    await expect(service.exportSelection(['doc-1'])).rejects.toThrow(
+      /unsafe managed file path for document doc-1: files\/\.\.\/exports\/foo\.pdf/,
+    )
+    expect(readdirSync(join(root, 'exports'))).toEqual(['foo.pdf'])
+  })
+
+  it('creates a unique zip path for repeated same-day exports', async () => {
+    const root = makeTempRoot()
+    writeFileSync(join(root, 'files', 'doc-1.pdf'), 'pdf content')
+    const service = createExportService({
+      libraryRoot: root,
+      exportsDir: join(root, 'exports'),
+      getSnapshot: () => makeSnapshot(),
+    })
+
+    const firstZipPath = await service.exportSelection(['doc-1'])
+    const secondZipPath = await service.exportSelection(['doc-1'])
+
+    expect(secondZipPath).not.toBe(firstZipPath)
+    expect(readdirSync(join(root, 'exports')).sort()).toEqual(
+      [basename(firstZipPath), basename(secondZipPath)].sort(),
     )
   })
 })
