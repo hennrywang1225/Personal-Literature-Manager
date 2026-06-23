@@ -117,6 +117,9 @@ describe('App', () => {
     })
     expect(apiMocks.getSnapshot).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('已导入 1 篇文献。')).toBeInTheDocument()
+    expect(await screen.findByRole('row', { name: /Edited Paper/ })).toHaveClass(
+      'is-selected',
+    )
   })
 
   it('keeps the import dialog open and shows submit errors inside it', async () => {

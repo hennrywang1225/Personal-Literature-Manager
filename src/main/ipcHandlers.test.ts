@@ -13,6 +13,23 @@ vi.mock('electron', () => ({
 
 import { registerIpcHandlers } from './ipcHandlers'
 
+function validImportConfirmation(overrides: Record<string, unknown> = {}) {
+  return {
+    sourcePath: 'notes.txt',
+    title: 'Notes',
+    authors: '',
+    year: null,
+    doi: '',
+    venue: '',
+    categoryId: null,
+    tags: [],
+    importance: 3,
+    readingStatus: 'To Read',
+    note: '',
+    ...overrides,
+  }
+}
+
 function registerTestHandlers() {
   const options = {
     repo: {
@@ -60,19 +77,10 @@ describe('registerIpcHandlers validation', () => {
 
     await expect(
       handler?.({}, [
-        {
-          sourcePath: 'notes.txt',
-          title: 'Notes',
-          authors: '',
-          year: null,
-          doi: '',
-          venue: '',
-          categoryId: null,
+        validImportConfirmation({
           tags: ['笔记'],
           importance: 6,
-          readingStatus: 'To Read',
-          note: '',
-        },
+        }),
       ]),
     ).rejects.toThrow(/importance must be an integer from 1 to 5/)
 
@@ -86,21 +94,27 @@ describe('registerIpcHandlers validation', () => {
 
     await expect(
       handler?.({}, [
-        {
-          sourcePath: 'notes.txt',
-          title: 'Notes',
-          authors: '',
+        validImportConfirmation({
           year: Number.NaN,
-          doi: '',
-          venue: '',
-          categoryId: null,
-          tags: [],
-          importance: 3,
-          readingStatus: 'To Read',
-          note: '',
-        },
+        }),
       ]),
-    ).rejects.toThrow(/year must be a finite number or null/)
+    ).rejects.toThrow(/year must be a finite integer or null/)
+
+    expect(options.importService.confirmImports).not.toHaveBeenCalled()
+    expect(options.saveDatabase).not.toHaveBeenCalled()
+  })
+
+  it('rejects fractional import years before calling the import service', async () => {
+    const options = registerTestHandlers()
+    const handler = handlers.get('library:confirmImports')
+
+    await expect(
+      handler?.({}, [
+        validImportConfirmation({
+          year: 2026.5,
+        }),
+      ]),
+    ).rejects.toThrow(/year must be a finite integer or null/)
 
     expect(options.importService.confirmImports).not.toHaveBeenCalled()
     expect(options.saveDatabase).not.toHaveBeenCalled()
@@ -124,6 +138,18 @@ describe('registerIpcHandlers validation', () => {
 
     await expect(handler?.({}, 'doc-1', { title: 'Notes', storedFilePath: 'x' })).rejects.toThrow(
       /update patch contains unsupported key: storedFilePath/,
+    )
+
+    expect(options.repo.updateDocument).not.toHaveBeenCalled()
+    expect(options.saveDatabase).not.toHaveBeenCalled()
+  })
+
+  it('rejects fractional update years before calling the repository', async () => {
+    const options = registerTestHandlers()
+    const handler = handlers.get('library:updateDocument')
+
+    await expect(handler?.({}, 'doc-1', { year: 2026.5 })).rejects.toThrow(
+      /year must be a finite integer or null/,
     )
 
     expect(options.repo.updateDocument).not.toHaveBeenCalled()

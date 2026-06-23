@@ -58,10 +58,13 @@ export function ImportReviewDialog({
         itemIndex === index ? { ...item, ...patch } : item,
       ),
     )
-    setFieldErrors((currentErrors) => ({
-      ...currentErrors,
-      [index]: { ...currentErrors[index], year: undefined },
-    }))
+
+    if ('yearInput' in patch) {
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        [index]: { ...currentErrors[index], year: undefined },
+      }))
+    }
   }
 
   const buildConfirmations = (): ImportConfirmation[] | null => {

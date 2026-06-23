@@ -33,13 +33,37 @@ describe('ImportReviewDialog', () => {
       />,
     )
 
+    expect(screen.getByText('paper.pdf')).toBeInTheDocument()
+    expect(screen.getByText('PDF')).toBeInTheDocument()
+
     fireEvent.change(screen.getByLabelText('标题'), {
       target: { value: 'Edited Paper' },
+    })
+    fireEvent.change(screen.getByLabelText('作者'), {
+      target: { value: 'Edited Author' },
+    })
+    fireEvent.change(screen.getByLabelText(/^年份/), {
+      target: { value: '2027' },
+    })
+    fireEvent.change(screen.getByLabelText('DOI'), {
+      target: { value: '10.1000/edited' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存导入' }))
 
     expect(onConfirm).toHaveBeenCalledWith([
-      expect.objectContaining({ title: 'Edited Paper' }),
+      {
+        sourcePath: 'C:/paper.pdf',
+        title: 'Edited Paper',
+        authors: 'Edited Author',
+        year: 2027,
+        doi: '10.1000/edited',
+        venue: '',
+        categoryId: null,
+        tags: [],
+        importance: 3,
+        readingStatus: 'To Read',
+        note: '',
+      },
     ])
   })
 
@@ -64,7 +88,7 @@ describe('ImportReviewDialog', () => {
     ])
   })
 
-  it('shows a field error and blocks save for an invalid year', () => {
+  it('keeps the year error until the year is valid', () => {
     const onConfirm = vi.fn()
 
     render(
@@ -82,6 +106,26 @@ describe('ImportReviewDialog', () => {
 
     expect(screen.getByText('年份必须是有效整数。')).toBeInTheDocument()
     expect(onConfirm).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText('标题'), {
+      target: { value: 'Title After Error' },
+    })
+
+    expect(screen.getByText('年份必须是有效整数。')).toBeInTheDocument()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(/^年份/), {
+      target: { value: '2027' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存导入' }))
+
+    expect(screen.queryByText('年份必须是有效整数。')).not.toBeInTheDocument()
+    expect(onConfirm).toHaveBeenCalledWith([
+      expect.objectContaining({
+        title: 'Title After Error',
+        year: 2027,
+      }),
+    ])
   })
 
   it('shows submit errors inside the dialog', () => {

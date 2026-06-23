@@ -80,8 +80,13 @@ function assertString(value: unknown, label: string): asserts value is string {
 }
 
 function assertNumberOrNull(value: unknown, label: string): asserts value is number | null {
-  if (value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
-    throw new Error(`${label} must be a finite number or null`)
+  if (
+    value !== null &&
+    (typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      !Number.isInteger(value))
+  ) {
+    throw new Error(`${label} must be a finite integer or null`)
   }
 }
 
