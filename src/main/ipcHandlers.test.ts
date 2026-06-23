@@ -80,6 +80,32 @@ describe('registerIpcHandlers validation', () => {
     expect(options.saveDatabase).not.toHaveBeenCalled()
   })
 
+  it('rejects NaN import years before calling the import service', async () => {
+    const options = registerTestHandlers()
+    const handler = handlers.get('library:confirmImports')
+
+    await expect(
+      handler?.({}, [
+        {
+          sourcePath: 'notes.txt',
+          title: 'Notes',
+          authors: '',
+          year: Number.NaN,
+          doi: '',
+          venue: '',
+          categoryId: null,
+          tags: [],
+          importance: 3,
+          readingStatus: 'To Read',
+          note: '',
+        },
+      ]),
+    ).rejects.toThrow(/year must be a finite number or null/)
+
+    expect(options.importService.confirmImports).not.toHaveBeenCalled()
+    expect(options.saveDatabase).not.toHaveBeenCalled()
+  })
+
   it('rejects invalid update document arguments before calling the repository', async () => {
     const options = registerTestHandlers()
     const handler = handlers.get('library:updateDocument')

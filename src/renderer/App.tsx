@@ -44,6 +44,7 @@ export function App(): JSX.Element {
   const [importCandidates, setImportCandidates] = useState<ImportCandidate[]>(
     [],
   )
+  const [importSubmitError, setImportSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -93,6 +94,7 @@ export function App(): JSX.Element {
   const handleImport = async () => {
     try {
       setErrorMessage(null)
+      setImportSubmitError(null)
       const candidates = await libraryApi.chooseImportFiles()
 
       if (candidates.length === 0) {
@@ -110,6 +112,7 @@ export function App(): JSX.Element {
   const handleConfirmImport = async (confirmations: ImportConfirmation[]) => {
     try {
       setErrorMessage(null)
+      setImportSubmitError(null)
       const importedDocuments = await libraryApi.confirmImports(confirmations)
       const nextSnapshot = await libraryApi.getSnapshot()
 
@@ -118,14 +121,16 @@ export function App(): JSX.Element {
         importedDocuments[0]?.id ?? nextSnapshot.documents[0]?.id ?? null,
       )
       setImportCandidates([])
+      setImportSubmitError(null)
       setStatusMessage(`已导入 ${importedDocuments.length} 篇文献。`)
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : '保存导入失败')
+      setImportSubmitError(error instanceof Error ? error.message : '保存导入失败')
     }
   }
 
   const handleCancelImport = () => {
     setImportCandidates([])
+    setImportSubmitError(null)
     setStatusMessage('已取消导入。')
   }
 
@@ -157,6 +162,7 @@ export function App(): JSX.Element {
           candidates={importCandidates}
           onCancel={handleCancelImport}
           onConfirm={handleConfirmImport}
+          submitError={importSubmitError}
         />
       ) : null}
       {!isLoading && mode === 'reader' ? (

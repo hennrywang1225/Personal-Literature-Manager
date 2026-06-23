@@ -6,16 +6,23 @@ interface ImportReviewDialogProps {
   candidates: ImportCandidate[]
   onConfirm: (items: ImportConfirmation[]) => void
   onCancel: () => void
+  submitError?: string | null
 }
+
+type ImportDraft = Omit<ImportConfirmation, 'year'> & {
+  yearInput: string
+}
+
+type ImportFieldErrors = Partial<Record<number, { year?: string }>>
 
 function candidateToConfirmation(
   candidate: ImportCandidate,
-): ImportConfirmation {
+): ImportDraft {
   return {
     sourcePath: candidate.sourcePath,
     title: candidate.detectedTitle,
     authors: candidate.detectedAuthors,
-    year: candidate.detectedYear,
+    yearInput: candidate.detectedYear?.toString() ?? '',
     doi: candidate.detectedDoi,
     venue: candidate.detectedVenue,
     categoryId: null,
@@ -30,24 +37,68 @@ export function ImportReviewDialog({
   candidates,
   onCancel,
   onConfirm,
+  submitError,
 }: ImportReviewDialogProps): JSX.Element {
-  const [items, setItems] = useState<ImportConfirmation[]>(() =>
+  const [items, setItems] = useState<ImportDraft[]>(() =>
     candidates.map(candidateToConfirmation),
   )
+  const [fieldErrors, setFieldErrors] = useState<ImportFieldErrors>({})
 
   useEffect(() => {
     setItems(candidates.map(candidateToConfirmation))
+    setFieldErrors({})
   }, [candidates])
 
   const updateItem = (
     index: number,
-    patch: Partial<Pick<ImportConfirmation, 'title' | 'authors' | 'year' | 'doi'>>,
+    patch: Partial<Pick<ImportDraft, 'title' | 'authors' | 'yearInput' | 'doi'>>,
   ) => {
     setItems((currentItems) =>
       currentItems.map((item, itemIndex) =>
         itemIndex === index ? { ...item, ...patch } : item,
       ),
     )
+    setFieldErrors((currentErrors) => ({
+      ...currentErrors,
+      [index]: { ...currentErrors[index], year: undefined },
+    }))
+  }
+
+  const buildConfirmations = (): ImportConfirmation[] | null => {
+    const nextErrors: ImportFieldErrors = {}
+
+    const confirmations = items.map((item, index) => {
+      const trimmedYear = item.yearInput.trim()
+      const year = trimmedYear === '' ? null : Number(trimmedYear)
+
+      if (
+        trimmedYear !== '' &&
+        (!Number.isFinite(year) || !Number.isInteger(year))
+      ) {
+        nextErrors[index] = { year: '年份必须是有效整数。' }
+      }
+
+      return {
+        ...item,
+        year,
+      }
+    })
+
+    setFieldErrors(nextErrors)
+
+    if (Object.keys(nextErrors).length > 0) {
+      return null
+    }
+
+    return confirmations.map(({ yearInput: _yearInput, ...confirmation }) => confirmation)
+  }
+
+  const handleConfirm = () => {
+    const confirmations = buildConfirmations()
+
+    if (confirmations) {
+      onConfirm(confirmations)
+    }
   }
 
   return (
@@ -66,6 +117,12 @@ export function ImportReviewDialog({
             取消
           </button>
         </header>
+
+        {submitError ? (
+          <p className="import-review-error" role="alert">
+            {submitError}
+          </p>
+        ) : null}
 
         <div className="import-review-list">
           {items.map((item, index) => {
@@ -107,15 +164,18 @@ export function ImportReviewDialog({
                       id={`${inputId}-year`}
                       onChange={(event) =>
                         updateItem(index, {
-                          year:
-                            event.target.value === ''
-                              ? null
-                              : Number(event.target.value),
+                          yearInput: event.target.value,
                         })
                       }
+                      step={1}
                       type="number"
-                      value={item.year ?? ''}
+                      value={item.yearInput}
                     />
+                    {fieldErrors[index]?.year ? (
+                      <span className="import-review-field-error">
+                        {fieldErrors[index]?.year}
+                      </span>
+                    ) : null}
                   </label>
                   <label htmlFor={`${inputId}-doi`}>
                     DOI
@@ -140,7 +200,7 @@ export function ImportReviewDialog({
           </button>
           <button
             className="primary-button"
-            onClick={() => onConfirm(items)}
+            onClick={handleConfirm}
             type="button"
           >
             保存导入

@@ -5,6 +5,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -15,6 +16,40 @@ const snapshot: LibrarySnapshot = {
   documents: [],
   categories: [],
   tags: [],
+}
+
+const importCandidate = {
+  sourcePath: 'C:/paper.pdf',
+  originalFileName: 'paper.pdf',
+  fileType: 'pdf' as const,
+  detectedTitle: 'Detected Paper',
+  detectedAuthors: 'Author',
+  detectedYear: 2026,
+  detectedDoi: '10.1000/example',
+  detectedVenue: '',
+  extractionStatus: 'detected' as const,
+}
+
+const importedDocument: DocumentRecord = {
+  id: 'doc-1',
+  title: 'Edited Paper',
+  authors: 'Author',
+  year: 2026,
+  doi: '10.1000/example',
+  venue: '',
+  fileType: 'pdf',
+  originalFileName: 'paper.pdf',
+  storedFileName: 'doc-1.pdf',
+  storedFilePath: 'C:/library/doc-1.pdf',
+  categoryId: null,
+  categoryName: null,
+  tags: [],
+  importance: 3,
+  readingStatus: 'To Read',
+  note: '',
+  createdAt: '2026-06-23T00:00:00.000Z',
+  updatedAt: '2026-06-23T00:00:00.000Z',
+  lastOpenedAt: null,
 }
 
 const apiMocks = vi.hoisted(() => ({
@@ -54,46 +89,13 @@ describe('App', () => {
   })
 
   it('imports reviewed files and refreshes the library', async () => {
-    const importedDocument: DocumentRecord = {
-      id: 'doc-1',
-      title: 'Edited Paper',
-      authors: 'Author',
-      year: 2026,
-      doi: '10.1000/example',
-      venue: '',
-      fileType: 'pdf',
-      originalFileName: 'paper.pdf',
-      storedFileName: 'doc-1.pdf',
-      storedFilePath: 'C:/library/doc-1.pdf',
-      categoryId: null,
-      categoryName: null,
-      tags: [],
-      importance: 3,
-      readingStatus: 'To Read',
-      note: '',
-      createdAt: '2026-06-23T00:00:00.000Z',
-      updatedAt: '2026-06-23T00:00:00.000Z',
-      lastOpenedAt: null,
-    }
     apiMocks.getSnapshot
       .mockResolvedValueOnce(snapshot)
       .mockResolvedValueOnce({
         ...snapshot,
         documents: [importedDocument],
       })
-    apiMocks.chooseImportFiles.mockResolvedValue([
-      {
-        sourcePath: 'C:/paper.pdf',
-        originalFileName: 'paper.pdf',
-        fileType: 'pdf',
-        detectedTitle: 'Detected Paper',
-        detectedAuthors: 'Author',
-        detectedYear: 2026,
-        detectedDoi: '10.1000/example',
-        detectedVenue: '',
-        extractionStatus: 'detected',
-      },
-    ])
+    apiMocks.chooseImportFiles.mockResolvedValue([importCandidate])
     apiMocks.confirmImports.mockResolvedValue([importedDocument])
 
     render(<App />)
@@ -115,5 +117,34 @@ describe('App', () => {
     })
     expect(apiMocks.getSnapshot).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('已导入 1 篇文献。')).toBeInTheDocument()
+  })
+
+  it('keeps the import dialog open and shows submit errors inside it', async () => {
+    apiMocks.getSnapshot
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce({
+        ...snapshot,
+        documents: [importedDocument],
+      })
+    apiMocks.chooseImportFiles.mockResolvedValue([importCandidate])
+    apiMocks.confirmImports
+      .mockRejectedValueOnce(new Error('磁盘已满'))
+      .mockResolvedValueOnce([importedDocument])
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '导入文献' }))
+    fireEvent.click(await screen.findByRole('button', { name: '保存导入' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('磁盘已满')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存导入' }))
+
+    await waitFor(() => {
+      expect(apiMocks.confirmImports).toHaveBeenCalledTimes(2)
+    })
+    expect(await screen.findByText('已导入 1 篇文献。')).toBeInTheDocument()
+    expect(screen.queryByText('磁盘已满')).not.toBeInTheDocument()
   })
 })
