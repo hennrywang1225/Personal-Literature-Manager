@@ -57,6 +57,8 @@ const apiMocks = vi.hoisted(() => ({
   chooseImportFiles: vi.fn<() => Promise<unknown[]>>(),
   confirmImports: vi.fn<() => Promise<DocumentRecord[]>>(),
   updateDocument: vi.fn(),
+  getFileUrl: vi.fn<(documentId: string) => Promise<string>>(),
+  openExternal: vi.fn<(documentId: string) => Promise<string>>(),
   exportAll: vi.fn(),
 }))
 
@@ -66,9 +68,32 @@ vi.mock('./api/client', () => ({
     chooseImportFiles: apiMocks.chooseImportFiles,
     confirmImports: apiMocks.confirmImports,
     updateDocument: apiMocks.updateDocument,
+    getFileUrl: apiMocks.getFileUrl,
+    openExternal: apiMocks.openExternal,
     exportAll: apiMocks.exportAll,
   },
 }))
+
+const textDocument: DocumentRecord = {
+  ...importedDocument,
+  id: 'doc-2',
+  title: 'Reading Notes',
+  authors: 'Local Author',
+  year: 2026,
+  fileType: 'txt',
+  originalFileName: 'notes.txt',
+  storedFileName: 'doc-2.txt',
+  storedFilePath: 'C:/library/doc-2.txt',
+  tags: ['Notes'],
+  importance: 2,
+  readingStatus: 'Reading',
+  note: '',
+}
+
+const readerSnapshot: LibrarySnapshot = {
+  ...snapshot,
+  documents: [importedDocument, textDocument],
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -149,5 +174,61 @@ describe('App', () => {
     })
     expect(await screen.findByText('已导入 1 篇文献。')).toBeInTheDocument()
     expect(screen.queryByText('磁盘已满')).not.toBeInTheDocument()
+  })
+
+  it('loads a PDF file URL and renders the reader iframe after entering reader mode', async () => {
+    apiMocks.getSnapshot.mockResolvedValue(readerSnapshot)
+    apiMocks.getFileUrl.mockResolvedValue('file:///C:/library/doc-1.pdf')
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开阅读模式' }))
+
+    await waitFor(() => {
+      expect(apiMocks.getFileUrl).toHaveBeenCalledWith('doc-1')
+    })
+    expect(await screen.findByTitle('PDF 预览：Edited Paper')).toHaveAttribute(
+      'src',
+      'file:///C:/library/doc-1.pdf',
+    )
+  })
+
+  it('clears the file URL for non-PDF selections and opens them externally', async () => {
+    apiMocks.getSnapshot.mockResolvedValue(readerSnapshot)
+    apiMocks.getFileUrl.mockResolvedValue('file:///C:/library/doc-1.pdf')
+    apiMocks.openExternal.mockResolvedValue('C:/library/doc-2.txt')
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开阅读模式' }))
+    expect(await screen.findByTitle('PDF 预览：Edited Paper')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Reading Notes/ }))
+
+    await waitFor(() => {
+      expect(screen.queryByTitle('PDF 预览：Edited Paper')).not.toBeInTheDocument()
+    })
+    expect(apiMocks.getFileUrl).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: '外部打开' }))
+
+    await waitFor(() => {
+      expect(apiMocks.openExternal).toHaveBeenCalledWith('doc-2')
+    })
+  })
+
+  it('shows a visible error when loading a PDF file URL fails', async () => {
+    apiMocks.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      documents: [importedDocument],
+    })
+    apiMocks.getFileUrl.mockRejectedValue(new Error('无法生成文件链接'))
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开阅读模式' }))
+
+    expect(await screen.findByText('无法生成文件链接')).toBeInTheDocument()
+    expect(screen.queryByTitle('PDF 预览：Edited Paper')).not.toBeInTheDocument()
   })
 })

@@ -9,6 +9,7 @@ import { libraryApi } from './api/client'
 import { AppShell } from './components/AppShell'
 import { ImportReviewDialog } from './components/ImportReviewDialog'
 import { LibraryView } from './components/LibraryView'
+import { ReaderView } from './components/ReaderView'
 
 type Mode = 'library' | 'reader'
 
@@ -45,6 +46,14 @@ export function App(): JSX.Element {
     [],
   )
   const [importSubmitError, setImportSubmitError] = useState<string | null>(null)
+  const [readerFileUrl, setReaderFileUrl] = useState<string | null>(null)
+  const [readerFileUrlError, setReaderFileUrlError] = useState<string | null>(
+    null,
+  )
+
+  const selectedDocument =
+    snapshot.documents.find((document) => document.id === selectedDocumentId) ??
+    null
 
   useEffect(() => {
     let isMounted = true
@@ -76,6 +85,48 @@ export function App(): JSX.Element {
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    if (
+      mode !== 'reader' ||
+      !selectedDocument ||
+      selectedDocument.fileType !== 'pdf'
+    ) {
+      setReaderFileUrl(null)
+      setReaderFileUrlError(null)
+      return () => {
+        isMounted = false
+      }
+    }
+
+    setReaderFileUrl(null)
+    setReaderFileUrlError(null)
+
+    async function loadReaderFileUrl() {
+      try {
+        const fileUrl = await libraryApi.getFileUrl(selectedDocument.id)
+
+        if (isMounted) {
+          setReaderFileUrl(fileUrl)
+        }
+      } catch (error) {
+        if (isMounted) {
+          setReaderFileUrl(null)
+          setReaderFileUrlError(
+            error instanceof Error ? error.message : '无法加载文件预览',
+          )
+        }
+      }
+    }
+
+    void loadReaderFileUrl()
+
+    return () => {
+      isMounted = false
+    }
+  }, [mode, selectedDocument?.fileType, selectedDocument?.id])
 
   const handleUpdateDocument = async (
     documentId: string,
@@ -138,6 +189,15 @@ export function App(): JSX.Element {
     await libraryApi.exportAll()
   }
 
+  const handleOpenExternal = async (documentId: string) => {
+    try {
+      setErrorMessage(null)
+      await libraryApi.openExternal(documentId)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '外部打开失败')
+    }
+  }
+
   return (
     <AppShell mode={mode} onModeChange={setMode}>
       {errorMessage ? <p className="status-message">{errorMessage}</p> : null}
@@ -166,10 +226,16 @@ export function App(): JSX.Element {
         />
       ) : null}
       {!isLoading && mode === 'reader' ? (
-        <section className="reader-placeholder">
-          <h2>阅读模式</h2>
-          <p>阅读视图将在后续任务中接入。</p>
-        </section>
+        <ReaderView
+          fileUrl={readerFileUrl}
+          fileUrlError={readerFileUrlError}
+          onBackToLibrary={() => setMode('library')}
+          onOpenExternal={handleOpenExternal}
+          onSelectDocument={setSelectedDocumentId}
+          onUpdateDocument={handleUpdateDocument}
+          selectedDocumentId={selectedDocumentId}
+          snapshot={snapshot}
+        />
       ) : null}
     </AppShell>
   )
