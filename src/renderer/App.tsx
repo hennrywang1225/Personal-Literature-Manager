@@ -153,14 +153,19 @@ export function App(): JSX.Element {
     documentId: string,
     patch: DocumentPatch,
   ) => {
-    const updatedDocument = await libraryApi.updateDocument(documentId, patch)
+    try {
+      const updatedDocument = await libraryApi.updateDocument(documentId, patch)
 
-    setSnapshot((currentSnapshot) => ({
-      ...currentSnapshot,
-      documents: currentSnapshot.documents.map((document) =>
-        document.id === documentId ? updatedDocument : document,
-      ),
-    }))
+      setSnapshot((currentSnapshot) => ({
+        ...currentSnapshot,
+        documents: currentSnapshot.documents.map((document) =>
+          document.id === documentId ? updatedDocument : document,
+        ),
+      }))
+      setErrorMessage(null)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '保存修改失败')
+    }
   }
 
   const handleImport = async () => {

@@ -383,4 +383,38 @@ describe('App', () => {
     expect(await screen.findByText('无法生成文件链接')).toBeInTheDocument()
     expect(screen.queryByTitle('PDF 预览：Edited Paper')).not.toBeInTheDocument()
   })
+
+  it('shows reader update errors and clears them after a successful reader edit', async () => {
+    apiMocks.getSnapshot.mockResolvedValue(readerSnapshot)
+    apiMocks.getFileUrl.mockResolvedValue('file:///C:/library/doc-1.pdf')
+    apiMocks.updateDocument
+      .mockRejectedValueOnce(new Error('保存修改失败'))
+      .mockResolvedValueOnce({
+        ...importedDocument,
+        importance: 4,
+      })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '打开阅读模式' }))
+    expect(await screen.findByTitle('PDF 预览：Edited Paper')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('阅读状态'), {
+      target: { value: 'Read' },
+    })
+
+    expect(await screen.findByText('保存修改失败')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /设置为 4 星/ }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('保存修改失败')).not.toBeInTheDocument()
+    })
+    expect(apiMocks.updateDocument).toHaveBeenCalledWith('doc-1', {
+      readingStatus: 'Read',
+    })
+    expect(apiMocks.updateDocument).toHaveBeenCalledWith('doc-1', {
+      importance: 4,
+    })
+  })
 })
