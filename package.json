@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "npm run typecheck && npm run test && electron-vite build",
-    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:win": "set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/&& npm run build && electron-builder --win nsis portable",
     "lint:deps": "npm ls --depth=0"
   },
   "dependencies": {

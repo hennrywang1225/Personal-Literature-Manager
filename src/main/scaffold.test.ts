@@ -15,6 +15,9 @@ describe('project scaffold', () => {
     expect(packageJson.name).toBe('personal-literature-manager')
     expect(packageJson.description).toBe('Personal Windows literature manager')
     expect(packageJson.scripts.test).toBe('vitest run')
+    expect(packageJson.scripts['dist:win']).toContain(
+      'ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/',
+    )
   })
 
   it('sets the required BrowserWindow title', () => {
@@ -31,6 +34,12 @@ describe('project scaffold', () => {
 
     expect(builderConfig).toContain('appId: com.local.personal-literature-manager')
     expect(builderConfig).toContain('productName: Personal Literature Manager')
+    expect(builderConfig).toContain('electronDist: node_modules/electron/dist')
+    expect(builderConfig).toContain('extraResources:')
+    expect(builderConfig).toContain('node_modules/sql.js/dist/sql-wasm.wasm')
+    expect(builderConfig).toContain('artifactName: "${productName}-${version}-${arch}-nsis.${ext}"')
+    expect(builderConfig).toContain('signAndEditExecutable: false')
+    expect(builderConfig).toContain('artifactName: "${productName}-${version}-portable.${ext}"')
     expect(nodeTsConfig.compilerOptions.esModuleInterop).toBe(true)
   })
 })

@@ -1,15 +1,24 @@
 appId: com.local.personal-literature-manager
 productName: Personal Literature Manager
+electronDist: node_modules/electron/dist
 directories:
   output: release
 files:
   - dist/**
   - package.json
+extraResources:
+  - from: node_modules/sql.js/dist/sql-wasm.wasm
+    to: sql-wasm.wasm
 asar: true
 win:
   target:
     - nsis
     - portable
+  signAndEditExecutable: false
 nsis:
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
+  artifactName: "${productName}-${version}-${arch}-nsis.${ext}"
+portable:
+  artifactName: "${productName}-${version}-portable.${ext}"

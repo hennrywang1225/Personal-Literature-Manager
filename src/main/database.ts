@@ -97,8 +97,31 @@ create table if not exists app_settings (
 );
 `
 
-function locateSqlJsFile(fileName: string) {
-  return join(process.cwd(), 'node_modules', 'sql.js', 'dist', fileName)
+export function locateSqlJsFile(fileName: string) {
+  const nodeModulesPath = join(
+    process.cwd(),
+    'node_modules',
+    'sql.js',
+    'dist',
+    fileName,
+  )
+
+  if (process.env.NODE_ENV === 'test') {
+    return nodeModulesPath
+  }
+
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string })
+    .resourcesPath
+
+  if (resourcesPath) {
+    const packagedPath = join(resourcesPath, fileName)
+
+    if (existsSync(packagedPath)) {
+      return packagedPath
+    }
+  }
+
+  return nodeModulesPath
 }
 
 function mapResults<T extends SqlRow>(

@@ -1,10 +1,13 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { openLibraryDatabase } from './database'
+import { locateSqlJsFile, openLibraryDatabase } from './database'
 
 const tempDirs: string[] = []
+const originalNodeEnv = process.env.NODE_ENV
+const originalResourcesPath = (process as NodeJS.Process & { resourcesPath?: string })
+  .resourcesPath
 
 function makeDatabasePath() {
   const tempDir = mkdtempSync(join(tmpdir(), 'literature-manager-db-'))
@@ -13,12 +16,49 @@ function makeDatabasePath() {
 }
 
 afterEach(() => {
+  process.env.NODE_ENV = originalNodeEnv
+  Object.defineProperty(process, 'resourcesPath', {
+    configurable: true,
+    value: originalResourcesPath,
+  })
+
   for (const tempDir of tempDirs.splice(0)) {
     rmSync(tempDir, { force: true, recursive: true })
   }
 })
 
 describe('openLibraryDatabase', () => {
+  it('locates sql.js wasm from packaged resources outside tests', () => {
+    const resourceDir = mkdtempSync(join(tmpdir(), 'literature-manager-resources-'))
+    tempDirs.push(resourceDir)
+    const wasmPath = join(resourceDir, 'sql-wasm.wasm')
+    writeFileSync(wasmPath, 'wasm')
+
+    process.env.NODE_ENV = 'production'
+    Object.defineProperty(process, 'resourcesPath', {
+      configurable: true,
+      value: resourceDir,
+    })
+
+    expect(locateSqlJsFile('sql-wasm.wasm')).toBe(wasmPath)
+  })
+
+  it('keeps the node_modules sql.js path during tests', () => {
+    const resourceDir = mkdtempSync(join(tmpdir(), 'literature-manager-resources-'))
+    tempDirs.push(resourceDir)
+    writeFileSync(join(resourceDir, 'sql-wasm.wasm'), 'wasm')
+
+    process.env.NODE_ENV = 'test'
+    Object.defineProperty(process, 'resourcesPath', {
+      configurable: true,
+      value: resourceDir,
+    })
+
+    expect(locateSqlJsFile('sql-wasm.wasm')).toBe(
+      join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+    )
+  })
+
   it('creates the schema and saves database bytes to disk', async () => {
     const databasePath = makeDatabasePath()
     const db = await openLibraryDatabase({ databasePath })
