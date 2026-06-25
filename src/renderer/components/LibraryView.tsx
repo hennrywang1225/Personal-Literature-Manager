@@ -161,7 +161,11 @@ export function LibraryView({
               value={query}
             />
           </label>
-          <div className="toolbar-actions">
+          <div
+            aria-label="文献操作"
+            className="toolbar-actions"
+            role="toolbar"
+          >
             <button
               className="icon-button"
               disabled={!selectedDocumentId}

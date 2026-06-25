@@ -70,6 +70,9 @@ describe('LibraryView', () => {
       />,
     )
 
+    expect(screen.getByRole('toolbar', { name: '文献操作' })).toHaveClass(
+      'toolbar-actions',
+    )
     expect(screen.getByRole('button', { name: '导出选中' })).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: '导出当前分类' }),
