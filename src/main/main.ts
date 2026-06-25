@@ -22,7 +22,7 @@ const createWindow = (): BrowserWindow => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      preload: join(__dirname, '../preload/preload.js')
+      preload: join(__dirname, '../preload/preload.cjs')
     }
   })
 

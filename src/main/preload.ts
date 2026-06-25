@@ -52,3 +52,4 @@ const literatureApi: LiteratureApi = {
 }
 
 contextBridge.exposeInMainWorld('literature', literatureApi)
+contextBridge.exposeInMainWorld('libraryApi', literatureApi)

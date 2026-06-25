@@ -26,6 +26,21 @@ describe('project scaffold', () => {
     expect(mainSource).toMatch(/title:\s*['"]Personal Literature Manager['"]/)
   })
 
+  it('loads the CommonJS preload with a cjs extension', () => {
+    const mainSource = readFileSync(resolve(projectRoot, 'src/main/main.ts'), 'utf8')
+    const viteConfig = readFileSync(resolve(projectRoot, 'electron.vite.config.ts'), 'utf8')
+
+    expect(mainSource).toContain("../preload/preload.cjs")
+    expect(viteConfig).toContain("entryFileNames: '[name].cjs'")
+  })
+
+  it('exposes the preload API under current and legacy names', () => {
+    const preloadSource = readFileSync(resolve(projectRoot, 'src/main/preload.ts'), 'utf8')
+
+    expect(preloadSource).toContain("exposeInMainWorld('literature', literatureApi)")
+    expect(preloadSource).toContain("exposeInMainWorld('libraryApi', literatureApi)")
+  })
+
   it('uses the required builder identity and node compiler option', () => {
     const builderConfig = readFileSync(resolve(projectRoot, 'electron-builder.yml'), 'utf8')
     const nodeTsConfig = JSON.parse(readFileSync(resolve(projectRoot, 'tsconfig.node.json'), 'utf8')) as {
