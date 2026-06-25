@@ -55,6 +55,69 @@ afterEach(() => {
 })
 
 describe('LibraryView', () => {
+  it('renders export actions in the toolbar', () => {
+    render(
+      <LibraryView
+        snapshot={snapshot}
+        selectedDocumentId="doc-1"
+        onSelectDocument={vi.fn()}
+        onOpenReader={vi.fn()}
+        onImport={vi.fn()}
+        onExportSelection={vi.fn()}
+        onExportCategory={vi.fn()}
+        onExportAll={vi.fn()}
+        onUpdateDocument={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '导出选中' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '导出当前分类' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '导出全部' })).toBeInTheDocument()
+  })
+
+  it('disables selected export without a selected document', () => {
+    render(
+      <LibraryView
+        snapshot={snapshot}
+        selectedDocumentId={null}
+        onSelectDocument={vi.fn()}
+        onOpenReader={vi.fn()}
+        onImport={vi.fn()}
+        onExportSelection={vi.fn()}
+        onExportCategory={vi.fn()}
+        onExportAll={vi.fn()}
+        onUpdateDocument={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '导出选中' })).toBeDisabled()
+  })
+
+  it('exports the selected sidebar category', () => {
+    const onExportCategory = vi.fn()
+
+    render(
+      <LibraryView
+        snapshot={snapshot}
+        selectedDocumentId="doc-1"
+        onSelectDocument={vi.fn()}
+        onOpenReader={vi.fn()}
+        onImport={vi.fn()}
+        onExportSelection={vi.fn()}
+        onExportCategory={onExportCategory}
+        onExportAll={vi.fn()}
+        onUpdateDocument={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '深度学习 1' }))
+    fireEvent.click(screen.getByRole('button', { name: '导出当前分类' }))
+
+    expect(onExportCategory).toHaveBeenCalledWith('cat-1')
+  })
+
   it('opens the selected document in reader mode', () => {
     const onOpenReader = vi.fn()
 
@@ -65,6 +128,8 @@ describe('LibraryView', () => {
         onSelectDocument={vi.fn()}
         onOpenReader={onOpenReader}
         onImport={vi.fn()}
+        onExportSelection={vi.fn()}
+        onExportCategory={vi.fn()}
         onExportAll={vi.fn()}
         onUpdateDocument={vi.fn()}
       />,
@@ -85,6 +150,8 @@ describe('LibraryView', () => {
         onSelectDocument={vi.fn()}
         onOpenReader={vi.fn()}
         onImport={vi.fn()}
+        onExportSelection={vi.fn()}
+        onExportCategory={vi.fn()}
         onExportAll={vi.fn()}
         onUpdateDocument={vi.fn()}
       />,

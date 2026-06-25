@@ -35,6 +35,10 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+}
+
 .app-shell {
   display: flex;
   min-height: 100vh;
@@ -389,8 +393,10 @@ button {
 
 .toolbar-actions {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .icon-button,
@@ -415,6 +421,11 @@ button {
   border: 1px solid #1f5f8f;
   background: #1f5f8f;
   color: #ffffff;
+}
+
+.icon-button:disabled,
+.primary-button:disabled {
+  opacity: 0.55;
 }
 
 .full-width {

@@ -1,4 +1,4 @@
-import { Download, FileInput, Search } from 'lucide-react'
+import { Archive, Download, FileArchive, FileInput, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { filterAndSortDocuments } from '../../shared/documentFilters'
 import type {
@@ -22,6 +22,8 @@ interface LibraryViewProps {
   onSelectDocument: (documentId: string) => void
   onOpenReader: (documentId: string) => void
   onImport: () => void
+  onExportSelection: () => void
+  onExportCategory: (categoryId: string | null) => void
   onExportAll: () => void
   onUpdateDocument: (
     documentId: string,
@@ -42,6 +44,8 @@ export function LibraryView({
   onSelectDocument,
   onOpenReader,
   onImport,
+  onExportSelection,
+  onExportCategory,
   onExportAll,
   onUpdateDocument,
 }: LibraryViewProps): JSX.Element {
@@ -158,8 +162,26 @@ export function LibraryView({
             />
           </label>
           <div className="toolbar-actions">
-            <button className="icon-button" onClick={onExportAll} type="button">
+            <button
+              className="icon-button"
+              disabled={!selectedDocumentId}
+              onClick={onExportSelection}
+              type="button"
+            >
               <Download aria-hidden="true" size={16} />
+              导出选中
+            </button>
+            <button
+              className="icon-button"
+              disabled={!categoryId}
+              onClick={() => onExportCategory(categoryId ?? null)}
+              type="button"
+            >
+              <Archive aria-hidden="true" size={16} />
+              导出当前分类
+            </button>
+            <button className="icon-button" onClick={onExportAll} type="button">
+              <FileArchive aria-hidden="true" size={16} />
               导出全部
             </button>
             <button className="primary-button" onClick={onImport} type="button">

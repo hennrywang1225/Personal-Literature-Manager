@@ -59,7 +59,9 @@ const apiMocks = vi.hoisted(() => ({
   updateDocument: vi.fn(),
   getFileUrl: vi.fn<(documentId: string) => Promise<string>>(),
   openExternal: vi.fn<(documentId: string) => Promise<string>>(),
-  exportAll: vi.fn(),
+  exportSelection: vi.fn<(documentIds: string[]) => Promise<string>>(),
+  exportCategory: vi.fn<(categoryId: string | null) => Promise<string>>(),
+  exportAll: vi.fn<() => Promise<string>>(),
 }))
 
 const readerViewRenders = vi.hoisted(
@@ -79,6 +81,8 @@ vi.mock('./api/client', () => ({
     updateDocument: apiMocks.updateDocument,
     getFileUrl: apiMocks.getFileUrl,
     openExternal: apiMocks.openExternal,
+    exportSelection: apiMocks.exportSelection,
+    exportCategory: apiMocks.exportCategory,
     exportAll: apiMocks.exportAll,
   },
 }))
@@ -126,6 +130,12 @@ const secondPdfDocument: DocumentRecord = {
   storedFilePath: 'C:/library/doc-3.pdf',
 }
 
+const categorizedDocument: DocumentRecord = {
+  ...importedDocument,
+  categoryId: 'cat-1',
+  categoryName: '深度学习',
+}
+
 const readerSnapshot: LibrarySnapshot = {
   ...snapshot,
   documents: [importedDocument, textDocument],
@@ -134,6 +144,21 @@ const readerSnapshot: LibrarySnapshot = {
 const twoPdfSnapshot: LibrarySnapshot = {
   ...snapshot,
   documents: [importedDocument, secondPdfDocument],
+}
+
+const categorizedSnapshot: LibrarySnapshot = {
+  documents: [categorizedDocument],
+  categories: [
+    {
+      id: 'cat-1',
+      name: '深度学习',
+      parentId: null,
+      sortOrder: 1,
+      createdAt: '2026-06-23T00:00:00.000Z',
+      updatedAt: '2026-06-23T00:00:00.000Z',
+    },
+  ],
+  tags: [],
 }
 
 function createDeferred<T>() {
@@ -227,6 +252,69 @@ describe('App', () => {
     })
     expect(await screen.findByText('已导入 1 篇文献。')).toBeInTheDocument()
     expect(screen.queryByText('磁盘已满')).not.toBeInTheDocument()
+  })
+
+  it('exports all documents and shows the zip path', async () => {
+    apiMocks.getSnapshot.mockResolvedValue(snapshot)
+    apiMocks.exportAll.mockResolvedValue('C:/exports/library-backup.zip')
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '导出全部' }))
+
+    await waitFor(() => {
+      expect(apiMocks.exportAll).toHaveBeenCalled()
+    })
+    expect(
+      await screen.findByText('已导出：C:/exports/library-backup.zip'),
+    ).toBeInTheDocument()
+  })
+
+  it('exports the selected document and shows the zip path', async () => {
+    apiMocks.getSnapshot.mockResolvedValue({
+      ...snapshot,
+      documents: [importedDocument],
+    })
+    apiMocks.exportSelection.mockResolvedValue('C:/exports/selected.zip')
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '导出选中' }))
+
+    await waitFor(() => {
+      expect(apiMocks.exportSelection).toHaveBeenCalledWith(['doc-1'])
+    })
+    expect(
+      await screen.findByText('已导出：C:/exports/selected.zip'),
+    ).toBeInTheDocument()
+  })
+
+  it('exports the current category and shows the zip path', async () => {
+    apiMocks.getSnapshot.mockResolvedValue(categorizedSnapshot)
+    apiMocks.exportCategory.mockResolvedValue('C:/exports/category.zip')
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '深度学习 1' }))
+    fireEvent.click(screen.getByRole('button', { name: '导出当前分类' }))
+
+    await waitFor(() => {
+      expect(apiMocks.exportCategory).toHaveBeenCalledWith('cat-1')
+    })
+    expect(
+      await screen.findByText('已导出：C:/exports/category.zip'),
+    ).toBeInTheDocument()
+  })
+
+  it('shows export errors', async () => {
+    apiMocks.getSnapshot.mockResolvedValue(snapshot)
+    apiMocks.exportAll.mockRejectedValue(new Error('导出失败'))
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '导出全部' }))
+
+    expect(await screen.findByText('导出失败')).toBeInTheDocument()
   })
 
   it('loads a PDF file URL and renders the reader iframe after entering reader mode', async () => {

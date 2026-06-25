@@ -211,8 +211,55 @@ export function App(): JSX.Element {
     setStatusMessage('已取消导入。')
   }
 
+  const showExportSuccess = (zipPath: string) => {
+    setErrorMessage(null)
+    setStatusMessage(`已导出：${zipPath}`)
+  }
+
+  const showExportError = (error: unknown) => {
+    setStatusMessage(null)
+    setErrorMessage(error instanceof Error ? error.message : '导出失败')
+  }
+
+  const handleExportSelection = async () => {
+    if (!selectedDocumentId) {
+      return
+    }
+
+    try {
+      setErrorMessage(null)
+      const zipPath = await libraryApi.exportSelection([selectedDocumentId])
+
+      showExportSuccess(zipPath)
+    } catch (error) {
+      showExportError(error)
+    }
+  }
+
+  const handleExportCategory = async (categoryId: string | null) => {
+    if (!categoryId) {
+      return
+    }
+
+    try {
+      setErrorMessage(null)
+      const zipPath = await libraryApi.exportCategory(categoryId)
+
+      showExportSuccess(zipPath)
+    } catch (error) {
+      showExportError(error)
+    }
+  }
+
   const handleExportAll = async () => {
-    await libraryApi.exportAll()
+    try {
+      setErrorMessage(null)
+      const zipPath = await libraryApi.exportAll()
+
+      showExportSuccess(zipPath)
+    } catch (error) {
+      showExportError(error)
+    }
   }
 
   const handleOpenExternal = async (documentId: string) => {
@@ -236,6 +283,8 @@ export function App(): JSX.Element {
       {!isLoading && mode === 'library' ? (
         <LibraryView
           onExportAll={handleExportAll}
+          onExportCategory={handleExportCategory}
+          onExportSelection={handleExportSelection}
           onImport={handleImport}
           onOpenReader={(documentId) => {
             setSelectedDocumentId(documentId)
