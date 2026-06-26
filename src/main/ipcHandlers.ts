@@ -1,10 +1,16 @@
 import { dialog, ipcMain } from 'electron'
 import { READING_STATUSES } from '../shared/constants'
 import type {
+  AppSettings,
+  CategoryRecord,
+  CreatePdfAnnotationInput,
   DocumentRecord,
   ImportCandidate,
   ImportConfirmation,
   LibrarySnapshot,
+  PdfAnnotationRecord,
+  PdfAnnotationRect,
+  PdfAnnotationType,
 } from '../shared/types'
 import type { createDocumentRepository } from './documentRepository'
 import type { createImportService } from './importService'
@@ -52,14 +58,28 @@ const updatePatchKeys = new Set([
 ])
 
 export interface RegisterIpcHandlersOptions {
-  repo: Pick<DocumentRepository, 'getSnapshot' | 'updateDocument'>
+  repo: Pick<
+    DocumentRepository,
+    | 'getSnapshot'
+    | 'upsertCategory'
+    | 'updateDocument'
+    | 'updateDocumentsCategory'
+    | 'deleteDocuments'
+    | 'listPdfAnnotations'
+    | 'createPdfAnnotation'
+    | 'deletePdfAnnotation'
+  >
   importService: Pick<ImportService, 'createCandidates' | 'confirmImports'>
   saveDatabase: () => Promise<void>
   getFileUrl: (documentId: string) => string | Promise<string>
+  getTextContent: (documentId: string) => string | Promise<string>
   openExternal: (documentId: string) => string | Promise<string>
-  exportSelection: (ids: string[]) => Promise<string>
-  exportCategory: (categoryId: string | null) => Promise<string>
-  exportAll: () => Promise<string>
+  exportSelection: (ids: string[]) => Promise<string | null>
+  exportCategory: (categoryId: string | null) => Promise<string | null>
+  exportAll: () => Promise<string | null>
+  getSettings: () => AppSettings | Promise<AppSettings>
+  chooseLibraryRoot: () => AppSettings | Promise<AppSettings>
+  chooseDefaultExportDirectory: () => AppSettings | Promise<AppSettings>
 }
 
 const importFilters = [
@@ -90,6 +110,12 @@ function assertNumberOrNull(value: unknown, label: string): asserts value is num
   }
 }
 
+function assertFiniteNumber(value: unknown, label: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number`)
+  }
+}
+
 function assertStringOrNull(value: unknown, label: string): asserts value is string | null {
   if (value !== null && typeof value !== 'string') {
     throw new Error(`${label} must be a string or null`)
@@ -98,6 +124,12 @@ function assertStringOrNull(value: unknown, label: string): asserts value is str
 
 function assertTags(value: unknown, label: string): asserts value is string[] {
   if (!Array.isArray(value) || value.some((tag) => typeof tag !== 'string')) {
+    throw new Error(`${label} must be an array of strings`)
+  }
+}
+
+function assertStringArray(value: unknown, label: string): asserts value is string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     throw new Error(`${label} must be an array of strings`)
   }
 }
@@ -203,6 +235,111 @@ function validateUpdateDocumentArgs(
   return { id, patch: patch as UpdateDocumentPatch }
 }
 
+function validateCategoryPayload(payload: unknown): {
+  name: string
+  parentId: string | null
+} {
+  if (!isRecord(payload)) {
+    throw new Error('category payload must be an object')
+  }
+
+  assertString(payload.name, 'category name')
+  assertStringOrNull(payload.parentId ?? null, 'category parentId')
+
+  const name = payload.name.trim()
+
+  if (!name) {
+    throw new Error('category name must not be empty')
+  }
+
+  return {
+    name,
+    parentId: payload.parentId ?? null,
+  }
+}
+
+function validateBulkCategoryArgs(
+  ids: unknown,
+  categoryId: unknown,
+): { ids: string[]; categoryId: string | null } {
+  assertStringArray(ids, 'document ids')
+  assertStringOrNull(categoryId, 'category id')
+
+  return {
+    ids,
+    categoryId,
+  }
+}
+
+function assertPdfAnnotationType(
+  value: unknown,
+  label: string,
+): asserts value is PdfAnnotationType {
+  if (value !== 'highlight' && value !== 'underline') {
+    throw new Error(`${label} must be highlight or underline`)
+  }
+}
+
+function validatePdfAnnotationRect(
+  value: unknown,
+  index: number,
+): PdfAnnotationRect {
+  if (!isRecord(value)) {
+    throw new Error(`annotation rect ${index} must be an object`)
+  }
+
+  assertNumberOrNull(value.pageNumber, `annotation rect ${index} pageNumber`)
+  assertFiniteNumber(value.x, `annotation rect ${index} x`)
+  assertFiniteNumber(value.y, `annotation rect ${index} y`)
+  assertFiniteNumber(value.width, `annotation rect width`)
+  assertFiniteNumber(value.height, `annotation rect ${index} height`)
+
+  if (value.pageNumber === null || value.pageNumber < 1) {
+    throw new Error(`annotation rect ${index} pageNumber must be at least 1`)
+  }
+
+  if (value.width <= 0 || value.height <= 0) {
+    throw new Error(`annotation rect ${index} size must be positive`)
+  }
+
+  return {
+    pageNumber: value.pageNumber,
+    x: value.x,
+    y: value.y,
+    width: value.width,
+    height: value.height,
+  }
+}
+
+function validateCreatePdfAnnotationPayload(
+  payload: unknown,
+): CreatePdfAnnotationInput {
+  if (!isRecord(payload)) {
+    throw new Error('PDF annotation payload must be an object')
+  }
+
+  assertString(payload.documentId, 'annotation documentId')
+  assertNumberOrNull(payload.pageNumber, 'annotation pageNumber')
+  assertPdfAnnotationType(payload.type, 'annotation type')
+  assertString(payload.color, 'annotation color')
+
+  if (payload.pageNumber === null || payload.pageNumber < 1) {
+    throw new Error('annotation pageNumber must be at least 1')
+  }
+
+  if (!Array.isArray(payload.rects) || payload.rects.length === 0) {
+    throw new Error('annotation rects must be a non-empty array')
+  }
+
+  return {
+    documentId: payload.documentId,
+    pageNumber: payload.pageNumber,
+    type: payload.type,
+    color: payload.color,
+    rects: payload.rects.map(validatePdfAnnotationRect),
+  }
+}
+
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   ipcMain.handle('library:getSnapshot', (): LibrarySnapshot => {
     return options.repo.getSnapshot()
@@ -242,9 +379,80 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     },
   )
 
+  ipcMain.handle(
+    'library:updateDocumentsCategory',
+    async (
+      _event,
+      rawIds: unknown,
+      rawCategoryId: unknown,
+    ): Promise<DocumentRecord[]> => {
+      const { ids, categoryId } = validateBulkCategoryArgs(rawIds, rawCategoryId)
+      const updated = options.repo.updateDocumentsCategory(ids, categoryId)
+
+      await options.saveDatabase()
+      return updated
+    },
+  )
+
+  ipcMain.handle(
+    'library:deleteDocuments',
+    async (_event, rawIds: unknown): Promise<DocumentRecord[]> => {
+      assertStringArray(rawIds, 'document ids')
+      const deleted = options.repo.deleteDocuments(rawIds)
+
+      await options.saveDatabase()
+      return deleted
+    },
+  )
+
+  ipcMain.handle(
+    'library:upsertCategory',
+    async (_event, payload: unknown): Promise<CategoryRecord> => {
+      const category = options.repo.upsertCategory(validateCategoryPayload(payload))
+
+      await options.saveDatabase()
+      return category
+    },
+  )
+
   ipcMain.handle('library:getFileUrl', (_event, documentId: string) => {
     return options.getFileUrl(documentId)
   })
+
+  ipcMain.handle('library:getTextContent', (_event, documentId: string) => {
+    return options.getTextContent(documentId)
+  })
+
+  ipcMain.handle(
+    'library:listPdfAnnotations',
+    async (_event, rawDocumentId: unknown): Promise<PdfAnnotationRecord[]> => {
+      assertString(rawDocumentId, 'document id')
+      return options.repo.listPdfAnnotations(rawDocumentId)
+    },
+  )
+
+  ipcMain.handle(
+    'library:createPdfAnnotation',
+    async (_event, payload: unknown): Promise<PdfAnnotationRecord> => {
+      const annotation = options.repo.createPdfAnnotation(
+        validateCreatePdfAnnotationPayload(payload),
+      )
+
+      await options.saveDatabase()
+      return annotation
+    },
+  )
+
+  ipcMain.handle(
+    'library:deletePdfAnnotation',
+    async (_event, rawAnnotationId: unknown): Promise<PdfAnnotationRecord> => {
+      assertString(rawAnnotationId, 'annotation id')
+      const annotation = options.repo.deletePdfAnnotation(rawAnnotationId)
+
+      await options.saveDatabase()
+      return annotation
+    },
+  )
 
   ipcMain.handle('library:openExternal', (_event, documentId: string) => {
     return options.openExternal(documentId)
@@ -260,5 +468,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
 
   ipcMain.handle('library:exportAll', () => {
     return options.exportAll()
+  })
+
+  ipcMain.handle('library:getSettings', () => {
+    return options.getSettings()
+  })
+
+  ipcMain.handle('library:chooseLibraryRoot', () => {
+    return options.chooseLibraryRoot()
+  })
+
+  ipcMain.handle('library:chooseDefaultExportDirectory', () => {
+    return options.chooseDefaultExportDirectory()
   })
 }

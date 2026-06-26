@@ -91,6 +91,29 @@ describe('openLibraryDatabase', () => {
     }
   })
 
+  it('creates the PDF annotation schema', async () => {
+    const db = await openLibraryDatabase({ databasePath: makeDatabasePath() })
+
+    try {
+      const columns = db.select<{ name: string }>(
+        "pragma table_info('pdf_annotations')",
+      )
+
+      expect(columns.map((column) => column.name)).toEqual([
+        'id',
+        'document_id',
+        'page_number',
+        'type',
+        'color',
+        'rects_json',
+        'created_at',
+        'updated_at',
+      ])
+    } finally {
+      db.close()
+    }
+  })
+
   it('rejects documents with invalid runtime domain values', async () => {
     const db = await openLibraryDatabase({ databasePath: makeDatabasePath() })
     const insertDocument = (

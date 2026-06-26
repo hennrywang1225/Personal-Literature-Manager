@@ -32,10 +32,46 @@ function cleanWhitespace(value: string | null | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim()
 }
 
-function titleFromFileName(fileName: string): string {
+function containsCjk(value: string): boolean {
+  return /[\u3400-\u9fff]/.test(value)
+}
+
+function cleanFileNameSegment(value: string): string {
+  return cleanWhitespace(value.replace(/[_-]+/g, ' '))
+}
+
+function metadataFromFileName(fileName: string): {
+  title: string
+  authors: string
+  hasExplicitAuthors: boolean
+} {
   const extension = extname(fileName)
   const name = basename(fileName, extension)
-  return cleanWhitespace(name.replace(/[_-]+/g, ' '))
+  const normalizedName = cleanWhitespace(name)
+  const separatorIndex = normalizedName.lastIndexOf('_')
+
+  if (separatorIndex > 0 && containsCjk(normalizedName)) {
+    const title = cleanWhitespace(normalizedName.slice(0, separatorIndex))
+    const authors = cleanWhitespace(normalizedName.slice(separatorIndex + 1))
+
+    if (title && authors && authors.length <= 40) {
+      return {
+        title,
+        authors,
+        hasExplicitAuthors: true,
+      }
+    }
+  }
+
+  return {
+    title: cleanFileNameSegment(name),
+    authors: '',
+    hasExplicitAuthors: false,
+  }
+}
+
+function titleFromFileName(fileName: string): string {
+  return metadataFromFileName(fileName).title
 }
 
 function titleFromFirstPageText(text: string | null | undefined): string {
@@ -68,14 +104,36 @@ function detectDoi(text: string): string {
   return match ? match[0].replace(/[.,;:)\]}]+$/g, '') : ''
 }
 
+function isPlaceholderAuthor(value: string): boolean {
+  return /^(?:cnki|unknown|untitled|anonymous)$/i.test(value.trim())
+}
+
+function looksLikePublicationHeader(value: string): boolean {
+  return (
+    /^第\s*\d+\s*期\b/.test(value) ||
+    /\b(?:acta|journal|proceedings|transactions)\b/i.test(value) ||
+    /(?:电子学报|学报|期刊|杂志|卷\s*第?\s*\d+\s*期)/.test(value)
+  )
+}
+
 export function deriveMetadataFromPdfSignals(
   signals: PdfSignals,
 ): DerivedPdfMetadata {
   const embeddedTitle = cleanWhitespace(signals.embeddedTitle)
   const firstPageTitle = titleFromFirstPageText(signals.firstPageText)
-  const detectedTitle =
-    embeddedTitle || firstPageTitle || titleFromFileName(signals.fileName)
-  const detectedAuthors = cleanWhitespace(signals.embeddedAuthor)
+  const fileNameMetadata = metadataFromFileName(signals.fileName)
+  const shouldPreferFileName =
+    containsCjk(fileNameMetadata.title) &&
+    (fileNameMetadata.hasExplicitAuthors ||
+      looksLikePublicationHeader(embeddedTitle) ||
+      looksLikePublicationHeader(firstPageTitle))
+  const detectedTitle = shouldPreferFileName
+    ? fileNameMetadata.title
+    : embeddedTitle || firstPageTitle || fileNameMetadata.title
+  const embeddedAuthor = cleanWhitespace(signals.embeddedAuthor)
+  const detectedAuthors =
+    fileNameMetadata.authors ||
+    (isPlaceholderAuthor(embeddedAuthor) ? '' : embeddedAuthor)
   const firstPageText = cleanWhitespace(signals.firstPageText)
   const detectedYear = detectYear(firstPageText)
   const detectedDoi = detectDoi(firstPageText)

@@ -276,4 +276,21 @@ describe('createExportService', () => {
       [basename(firstZipPath), basename(secondZipPath)].sort(),
     )
   })
+
+  it('writes an export to the caller-selected directory', async () => {
+    const root = makeTempRoot()
+    const chosenExportDir = join(makeTempRoot(), 'chosen-exports')
+    writeFileSync(join(root, 'files', 'doc-1.pdf'), 'pdf content')
+    const service = createExportService({
+      libraryRoot: root,
+      exportsDir: join(root, 'exports'),
+      getSnapshot: () => makeSnapshot(),
+    })
+
+    const zipPath = await service.exportSelection(['doc-1'], chosenExportDir)
+
+    expect(zipPath.startsWith(chosenExportDir)).toBe(true)
+    expect(readdirSync(join(root, 'exports'))).toEqual([])
+    expect(readdirSync(chosenExportDir)).toEqual([basename(zipPath)])
+  })
 })

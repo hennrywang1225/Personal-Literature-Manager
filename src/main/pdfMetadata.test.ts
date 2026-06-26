@@ -63,6 +63,25 @@ describe('deriveMetadataFromPdfSignals', () => {
       extractionStatus: 'detected',
     })
   })
+
+  it('prefers Chinese filename title and author over journal headers and CNKI metadata', () => {
+    expect(
+      deriveMetadataFromPdfSignals({
+        fileName: '基于改进LESO的四旋翼无人机模糊线性自抗扰控制方法_李壮举.pdf',
+        embeddedAuthor: 'CNKI',
+        firstPageText: `
+          第 9 期 2024 年 9 月电子学报 ACTA ELECTRONICA SINICA
+          基于改进LESO的四旋翼无人机模糊线性自抗扰控制方法
+          李壮举
+        `,
+      }),
+    ).toMatchObject({
+      detectedTitle: '基于改进LESO的四旋翼无人机模糊线性自抗扰控制方法',
+      detectedAuthors: '李壮举',
+      detectedYear: 2024,
+      extractionStatus: 'detected',
+    })
+  })
 })
 
 describe('extractPdfMetadata', () => {

@@ -90,6 +90,18 @@ create table if not exists document_tags (
   foreign key (tag_id) references tags(id) on delete cascade
 );
 
+create table if not exists pdf_annotations (
+  id text primary key,
+  document_id text not null,
+  page_number integer not null check (page_number >= 1),
+  type text not null check (type in ('highlight', 'underline')),
+  color text not null,
+  rects_json text not null,
+  created_at text not null,
+  updated_at text not null,
+  foreign key (document_id) references documents(id) on delete cascade
+);
+
 create table if not exists app_settings (
   key text primary key,
   value text not null,

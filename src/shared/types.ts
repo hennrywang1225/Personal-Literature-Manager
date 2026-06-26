@@ -1,5 +1,7 @@
 export type FileType = 'pdf' | 'doc' | 'docx' | 'txt' | 'md'
 
+export type PdfAnnotationType = 'highlight' | 'underline'
+
 export type ReadingStatus = 'To Read' | 'Reading' | 'Read' | 'Intensive'
 
 export type SortDirection = 'asc' | 'desc'
@@ -53,6 +55,33 @@ export interface DocumentRecord {
   lastOpenedAt: string | null
 }
 
+export interface PdfAnnotationRect {
+  pageNumber: number
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface PdfAnnotationRecord {
+  id: string
+  documentId: string
+  pageNumber: number
+  type: PdfAnnotationType
+  color: string
+  rects: PdfAnnotationRect[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreatePdfAnnotationInput {
+  documentId: string
+  pageNumber: number
+  type: PdfAnnotationType
+  color: string
+  rects: PdfAnnotationRect[]
+}
+
 export interface DocumentFilters {
   query?: string
   categoryId?: string
@@ -94,4 +123,9 @@ export interface LibrarySnapshot {
   documents: DocumentRecord[]
   categories: CategoryRecord[]
   tags: TagRecord[]
+}
+
+export interface AppSettings {
+  libraryRoot: string
+  defaultExportDir: string | null
 }

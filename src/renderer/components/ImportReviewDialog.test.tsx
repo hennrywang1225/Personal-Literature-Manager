@@ -88,6 +88,27 @@ describe('ImportReviewDialog', () => {
     ])
   })
 
+  it('uses the current category as the default import category', () => {
+    const onConfirm = vi.fn()
+
+    render(
+      <ImportReviewDialog
+        candidates={[candidate]}
+        defaultCategoryId="cat-1"
+        onCancel={vi.fn()}
+        onConfirm={onConfirm}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '保存导入' }))
+
+    expect(onConfirm).toHaveBeenCalledWith([
+      expect.objectContaining({
+        categoryId: 'cat-1',
+      }),
+    ])
+  })
+
   it('keeps the year error until the year is valid', () => {
     const onConfirm = vi.fn()
 

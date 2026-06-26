@@ -15,12 +15,22 @@ const missingApi: LiteratureApi = {
   getSnapshot: rejectMissingApi,
   chooseImportFiles: rejectMissingApi,
   confirmImports: rejectMissingApi,
+  upsertCategory: rejectMissingApi,
   updateDocument: rejectMissingApi,
+  updateDocumentsCategory: rejectMissingApi,
+  deleteDocuments: rejectMissingApi,
   getFileUrl: rejectMissingApi,
+  getTextContent: rejectMissingApi,
+  listPdfAnnotations: rejectMissingApi,
+  createPdfAnnotation: rejectMissingApi,
+  deletePdfAnnotation: rejectMissingApi,
   openExternal: rejectMissingApi,
   exportSelection: rejectMissingApi,
   exportCategory: rejectMissingApi,
   exportAll: rejectMissingApi,
+  getSettings: rejectMissingApi,
+  chooseLibraryRoot: rejectMissingApi,
+  chooseDefaultExportDirectory: rejectMissingApi,
 }
 
 export const libraryApi = window.literature ?? window.libraryApi ?? missingApi

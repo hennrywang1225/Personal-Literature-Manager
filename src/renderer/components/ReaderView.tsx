@@ -1,9 +1,13 @@
 import { ArrowLeft, ExternalLink, FileText } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import type {
+  CreatePdfAnnotationInput,
   DocumentRecord,
   LibrarySnapshot,
+  PdfAnnotationRecord,
   ReadingStatus,
 } from '../../shared/types'
+import { PdfAnnotationViewer } from './PdfAnnotationViewer'
 import { Stars } from './Stars'
 import { TagEditor } from './TagEditor'
 
@@ -16,8 +20,15 @@ interface ReaderViewProps {
   selectedDocumentId: string | null
   fileUrl: string | null
   fileUrlError: string | null
+  markdownContent: string | null
+  markdownContentError: string | null
+  pdfAnnotations: PdfAnnotationRecord[]
   onSelectDocument: (documentId: string) => void
   onBackToLibrary: () => void
+  onCreatePdfAnnotation: (
+    input: CreatePdfAnnotationInput,
+  ) => void | Promise<void>
+  onDeletePdfAnnotation: (annotationId: string) => void | Promise<void>
   onOpenExternal: (documentId: string) => void | Promise<void>
   onUpdateDocument: (
     documentId: string,
@@ -44,8 +55,13 @@ export function ReaderView({
   selectedDocumentId,
   fileUrl,
   fileUrlError,
+  markdownContent,
+  markdownContentError,
+  pdfAnnotations,
   onSelectDocument,
   onBackToLibrary,
+  onCreatePdfAnnotation,
+  onDeletePdfAnnotation,
   onOpenExternal,
   onUpdateDocument,
 }: ReaderViewProps): JSX.Element {
@@ -108,7 +124,8 @@ export function ReaderView({
                 <h2>{selectedDocument.title}</h2>
                 <p>{formatAuthorsAndYear(selectedDocument)}</p>
               </div>
-              {selectedDocument.fileType === 'pdf' ? (
+              {selectedDocument.fileType === 'pdf' ||
+              selectedDocument.fileType === 'md' ? (
                 <button
                   className="icon-button reader-secondary-action"
                   onClick={openSelectedDocumentExternally}
@@ -122,11 +139,20 @@ export function ReaderView({
 
             <div className="reader-preview">
               {selectedDocument.fileType === 'pdf' && fileUrl ? (
-                <iframe
-                  className="reader-pdf-frame"
-                  src={fileUrl}
-                  title={`PDF 预览：${selectedDocument.title}`}
+                <PdfAnnotationViewer
+                  annotations={pdfAnnotations}
+                  documentId={selectedDocument.id}
+                  fileUrl={fileUrl}
+                  onCreateAnnotation={onCreatePdfAnnotation}
+                  onDeleteAnnotation={onDeletePdfAnnotation}
                 />
+              ) : selectedDocument.fileType === 'md' && markdownContent ? (
+                <article
+                  aria-label={`Markdown 阅读：${selectedDocument.title}`}
+                  className="markdown-reader"
+                >
+                  <ReactMarkdown>{markdownContent}</ReactMarkdown>
+                </article>
               ) : (
                 <div className="reader-empty-state">
                   <FileText aria-hidden="true" size={34} />
@@ -134,6 +160,15 @@ export function ReaderView({
                     <>
                       <h3>{fileUrlError ? '无法加载 PDF 预览' : '正在准备 PDF 预览'}</h3>
                       <p>{fileUrlError ?? '文件链接生成后会显示在这里。'}</p>
+                    </>
+                  ) : selectedDocument.fileType === 'md' ? (
+                    <>
+                      <h3>
+                        {markdownContentError
+                          ? '无法加载 Markdown'
+                          : '正在准备 Markdown 阅读'}
+                      </h3>
+                      <p>{markdownContentError ?? '文件内容读取后会显示在这里。'}</p>
                     </>
                   ) : (
                     <>

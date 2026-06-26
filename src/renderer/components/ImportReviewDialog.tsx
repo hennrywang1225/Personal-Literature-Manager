@@ -4,6 +4,7 @@ import type { ImportCandidate, ImportConfirmation } from '../../shared/types'
 
 interface ImportReviewDialogProps {
   candidates: ImportCandidate[]
+  defaultCategoryId?: string | null
   onConfirm: (items: ImportConfirmation[]) => void
   onCancel: () => void
   submitError?: string | null
@@ -17,6 +18,7 @@ type ImportFieldErrors = Partial<Record<number, { year?: string }>>
 
 function candidateToConfirmation(
   candidate: ImportCandidate,
+  defaultCategoryId: string | null,
 ): ImportDraft {
   return {
     sourcePath: candidate.sourcePath,
@@ -25,7 +27,7 @@ function candidateToConfirmation(
     yearInput: candidate.detectedYear?.toString() ?? '',
     doi: candidate.detectedDoi,
     venue: candidate.detectedVenue,
-    categoryId: null,
+    categoryId: defaultCategoryId,
     tags: [],
     importance: DEFAULT_IMPORTANCE,
     readingStatus: 'To Read',
@@ -35,19 +37,26 @@ function candidateToConfirmation(
 
 export function ImportReviewDialog({
   candidates,
+  defaultCategoryId = null,
   onCancel,
   onConfirm,
   submitError,
 }: ImportReviewDialogProps): JSX.Element {
   const [items, setItems] = useState<ImportDraft[]>(() =>
-    candidates.map(candidateToConfirmation),
+    candidates.map((candidate) =>
+      candidateToConfirmation(candidate, defaultCategoryId),
+    ),
   )
   const [fieldErrors, setFieldErrors] = useState<ImportFieldErrors>({})
 
   useEffect(() => {
-    setItems(candidates.map(candidateToConfirmation))
+    setItems(
+      candidates.map((candidate) =>
+        candidateToConfirmation(candidate, defaultCategoryId),
+      ),
+    )
     setFieldErrors({})
-  }, [candidates])
+  }, [candidates, defaultCategoryId])
 
   const updateItem = (
     index: number,

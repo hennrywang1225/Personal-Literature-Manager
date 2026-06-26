@@ -104,11 +104,12 @@ export function createExportService({
     kind: ExportKind,
     snapshot: LibrarySnapshot,
     documents: DocumentRecord[],
+    targetExportsDir = exportsDir,
   ) {
     const limitedSnapshot = limitSnapshot(snapshot, documents)
 
     const documentFiles = await validateDocumentFiles(libraryRoot, limitedSnapshot.documents)
-    await mkdir(exportsDir, { recursive: true })
+    await mkdir(targetExportsDir, { recursive: true })
 
     const zip = new AdmZip()
     zip.addFile(
@@ -121,35 +122,43 @@ export function createExportService({
     }
 
     const exportPath = join(
-      exportsDir,
+      targetExportsDir,
       `${exportFileNames[kind]}-${dateStamp()}-${timeStamp()}-${shortId()}.zip`,
     )
     zip.writeZip(exportPath)
     return exportPath
   }
 
-  async function exportSelection(documentIds: string[]): Promise<string> {
+  async function exportSelection(
+    documentIds: string[],
+    targetExportsDir?: string,
+  ): Promise<string> {
     const snapshot = await getSnapshot()
     const selectedIds = new Set(documentIds)
     return writeExport(
       'selected',
       snapshot,
       snapshot.documents.filter((document) => selectedIds.has(document.id)),
+      targetExportsDir,
     )
   }
 
-  async function exportCategory(categoryId: string | null): Promise<string> {
+  async function exportCategory(
+    categoryId: string | null,
+    targetExportsDir?: string,
+  ): Promise<string> {
     const snapshot = await getSnapshot()
     return writeExport(
       'category',
       snapshot,
       snapshot.documents.filter((document) => document.categoryId === categoryId),
+      targetExportsDir,
     )
   }
 
-  async function exportAll(): Promise<string> {
+  async function exportAll(targetExportsDir?: string): Promise<string> {
     const snapshot = await getSnapshot()
-    return writeExport('all', snapshot, snapshot.documents)
+    return writeExport('all', snapshot, snapshot.documents, targetExportsDir)
   }
 
   return {

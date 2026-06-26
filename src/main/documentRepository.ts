@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import type {
   CategoryRecord,
+  CreatePdfAnnotationInput,
   DocumentRecord,
   FileType,
   ImportConfirmation,
   LibrarySnapshot,
+  PdfAnnotationRecord,
+  PdfAnnotationRect,
+  PdfAnnotationType,
   ReadingStatus,
   TagRecord,
 } from '../shared/types'
@@ -15,6 +19,11 @@ type CreateDocumentInput = ImportConfirmation & {
   originalFileName: string
   storedFileName: string
   storedFilePath: string
+}
+
+type UpsertCategoryInput = {
+  name: string
+  parentId?: string | null
 }
 
 type UpdateDocumentPatch = Partial<
@@ -72,6 +81,17 @@ type DocumentRow = {
   last_opened_at: string | null
 }
 
+type PdfAnnotationRow = {
+  id: string
+  document_id: string
+  page_number: number
+  type: PdfAnnotationType
+  color: string
+  rects_json: string
+  created_at: string
+  updated_at: string
+}
+
 const tagColor = '#64748b'
 
 function nowIso() {
@@ -127,6 +147,31 @@ function toDocument(row: DocumentRow, tags: string[]): DocumentRecord {
   }
 }
 
+function parseAnnotationRects(rectsJson: string): PdfAnnotationRect[] {
+  const parsed = JSON.parse(rectsJson) as PdfAnnotationRect[]
+
+  return parsed.map((rect) => ({
+    pageNumber: Number(rect.pageNumber),
+    x: Number(rect.x),
+    y: Number(rect.y),
+    width: Number(rect.width),
+    height: Number(rect.height),
+  }))
+}
+
+function toPdfAnnotation(row: PdfAnnotationRow): PdfAnnotationRecord {
+  return {
+    id: row.id,
+    documentId: row.document_id,
+    pageNumber: Number(row.page_number),
+    type: row.type,
+    color: row.color,
+    rects: parseAnnotationRects(row.rects_json),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 function normalizeTagNames(tags: string[]) {
   return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b),
@@ -138,7 +183,7 @@ export function createDocumentRepository(db: LibraryDatabase) {
     return db.select<CategoryRow>('select * from categories where id = ?', [id])[0]
   }
 
-  function upsertCategory({ name }: { name: string }): CategoryRecord {
+  function upsertCategory({ name, parentId = null }: UpsertCategoryInput): CategoryRecord {
     const trimmedName = name.trim()
     const existing = db.select<CategoryRow>(
       'select * from categories where name = ?',
@@ -153,7 +198,10 @@ export function createDocumentRepository(db: LibraryDatabase) {
     const sortOrder =
       Number(
         db.select<{ next_sort_order: number }>(
-          'select coalesce(max(sort_order), -1) + 1 as next_sort_order from categories',
+          `select coalesce(max(sort_order), -1) + 1 as next_sort_order
+           from categories
+           where parent_id is ?`,
+          [parentId],
         )[0]?.next_sort_order ?? 0,
       )
     const id = prefixedId('cat')
@@ -161,7 +209,7 @@ export function createDocumentRepository(db: LibraryDatabase) {
     db.exec(
       `insert into categories (id, name, parent_id, sort_order, created_at, updated_at)
        values (?, ?, ?, ?, ?, ?)`,
-      [id, trimmedName, null, sortOrder, timestamp, timestamp],
+      [id, trimmedName, parentId, sortOrder, timestamp, timestamp],
     )
 
     return toCategory(findCategoryById(id))
@@ -228,6 +276,19 @@ export function createDocumentRepository(db: LibraryDatabase) {
     }
 
     return toDocument(row, getDocumentTags(id))
+  }
+
+  function getPdfAnnotation(id: string): PdfAnnotationRecord {
+    const row = db.select<PdfAnnotationRow>(
+      'select * from pdf_annotations where id = ?',
+      [id],
+    )[0]
+
+    if (!row) {
+      throw new Error(`PDF annotation not found: ${id}`)
+    }
+
+    return toPdfAnnotation(row)
   }
 
   function createDocument(input: CreateDocumentInput): DocumentRecord {
@@ -310,6 +371,88 @@ export function createDocumentRepository(db: LibraryDatabase) {
     })
   }
 
+  function updateDocumentsCategory(
+    ids: string[],
+    categoryId: string | null,
+  ): DocumentRecord[] {
+    return db.transaction(() => {
+      const uniqueIds = [...new Set(ids)]
+      const timestamp = nowIso()
+
+      for (const id of uniqueIds) {
+        getDocument(id)
+        db.exec(
+          `update documents
+           set category_id = ?, updated_at = ?
+           where id = ?`,
+          [categoryId, timestamp, id],
+        )
+      }
+
+      return uniqueIds.map(getDocument)
+    })
+  }
+
+  function deleteDocuments(ids: string[]): DocumentRecord[] {
+    return db.transaction(() => {
+      const uniqueIds = [...new Set(ids)]
+      const documents = uniqueIds.map(getDocument)
+
+      for (const id of uniqueIds) {
+        db.exec('delete from document_tags where document_id = ?', [id])
+        db.exec('delete from documents where id = ?', [id])
+      }
+
+      return documents
+    })
+  }
+
+  function listPdfAnnotations(documentId: string): PdfAnnotationRecord[] {
+    return db
+      .select<PdfAnnotationRow>(
+        `select * from pdf_annotations
+         where document_id = ?
+         order by page_number asc, created_at asc`,
+        [documentId],
+      )
+      .map(toPdfAnnotation)
+  }
+
+  function createPdfAnnotation(
+    input: CreatePdfAnnotationInput,
+  ): PdfAnnotationRecord {
+    getDocument(input.documentId)
+
+    const timestamp = nowIso()
+    const id = prefixedId('ann')
+
+    db.exec(
+      `insert into pdf_annotations (
+        id, document_id, page_number, type, color, rects_json, created_at, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.documentId,
+        input.pageNumber,
+        input.type,
+        input.color,
+        JSON.stringify(input.rects),
+        timestamp,
+        timestamp,
+      ],
+    )
+
+    return getPdfAnnotation(id)
+  }
+
+  function deletePdfAnnotation(id: string): PdfAnnotationRecord {
+    const annotation = getPdfAnnotation(id)
+
+    db.exec('delete from pdf_annotations where id = ?', [id])
+
+    return annotation
+  }
+
   function getSnapshot(): LibrarySnapshot {
     const categories = db
       .select<CategoryRow>(
@@ -337,6 +480,11 @@ export function createDocumentRepository(db: LibraryDatabase) {
     transaction: db.transaction,
     createDocument,
     updateDocument,
+    updateDocumentsCategory,
+    deleteDocuments,
+    listPdfAnnotations,
+    createPdfAnnotation,
+    deletePdfAnnotation,
     getSnapshot,
     getDocument,
   }

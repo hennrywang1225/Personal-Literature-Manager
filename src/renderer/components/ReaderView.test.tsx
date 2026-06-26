@@ -3,8 +3,38 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { DocumentRecord, LibrarySnapshot } from '../../shared/types'
+import type {
+  CreatePdfAnnotationInput,
+  DocumentRecord,
+  LibrarySnapshot,
+  PdfAnnotationRecord,
+} from '../../shared/types'
 import { ReaderView } from './ReaderView'
+
+const pdfViewerRenders = vi.hoisted(
+  () =>
+    [] as Array<{
+      annotations: PdfAnnotationRecord[]
+      documentId: string
+      fileUrl: string
+      onCreateAnnotation: (input: CreatePdfAnnotationInput) => void | Promise<void>
+      onDeleteAnnotation: (annotationId: string) => void | Promise<void>
+    }>,
+)
+
+vi.mock('./PdfAnnotationViewer', () => ({
+  PdfAnnotationViewer: (
+    props: (typeof pdfViewerRenders)[number],
+  ): JSX.Element => {
+    pdfViewerRenders.push(props)
+
+    return (
+      <div data-testid="pdf-annotation-viewer">
+        PDF 标注阅读器：{props.fileUrl}
+      </div>
+    )
+  },
+}))
 
 const pdfDocument: DocumentRecord = {
   id: 'doc-1',
@@ -46,10 +76,47 @@ const textDocument: DocumentRecord = {
   note: '',
 }
 
+const markdownDocument: DocumentRecord = {
+  ...pdfDocument,
+  id: 'doc-3',
+  title: 'Markdown Notes',
+  authors: 'Local Author',
+  year: 2026,
+  fileType: 'md',
+  originalFileName: 'notes.md',
+  storedFileName: 'doc-3.md',
+  storedFilePath: 'files/doc-3.md',
+  categoryId: null,
+  categoryName: null,
+  tags: ['Notes'],
+  importance: 3,
+  readingStatus: 'Reading',
+  note: '',
+}
+
 const snapshot: LibrarySnapshot = {
   categories: [],
   tags: [],
-  documents: [pdfDocument, textDocument],
+  documents: [pdfDocument, textDocument, markdownDocument],
+}
+
+const pdfAnnotation: PdfAnnotationRecord = {
+  id: 'ann-1',
+  documentId: 'doc-1',
+  pageNumber: 1,
+  type: 'highlight',
+  color: '#fde047',
+  rects: [
+    {
+      height: 0.03,
+      pageNumber: 1,
+      width: 0.3,
+      x: 0.1,
+      y: 0.2,
+    },
+  ],
+  createdAt: '2026-06-26T00:00:00.000Z',
+  updatedAt: '2026-06-26T00:00:00.000Z',
 }
 
 function renderReaderView(
@@ -58,10 +125,15 @@ function renderReaderView(
   const props: ComponentProps<typeof ReaderView> = {
     fileUrl: 'file:///C:/library/doc-1.pdf',
     fileUrlError: null,
+    markdownContent: null,
+    markdownContentError: null,
     onBackToLibrary: vi.fn(),
+    onCreatePdfAnnotation: vi.fn(),
+    onDeletePdfAnnotation: vi.fn(),
     onOpenExternal: vi.fn(),
     onSelectDocument: vi.fn(),
     onUpdateDocument: vi.fn(),
+    pdfAnnotations: [pdfAnnotation],
     selectedDocumentId: 'doc-1',
     snapshot,
     ...overrides,
@@ -73,16 +145,23 @@ function renderReaderView(
 }
 
 afterEach(() => {
+  pdfViewerRenders.length = 0
   cleanup()
 })
 
 describe('ReaderView', () => {
-  it('renders the selected PDF in an iframe when fileUrl is available', () => {
+  it('renders the selected PDF in the annotation viewer when fileUrl is available', () => {
     renderReaderView()
 
-    expect(
-      screen.getByTitle('PDF 预览：Attention Is All You Need'),
-    ).toHaveAttribute('src', 'file:///C:/library/doc-1.pdf')
+    expect(screen.getByTestId('pdf-annotation-viewer')).toHaveTextContent(
+      'file:///C:/library/doc-1.pdf',
+    )
+    expect(pdfViewerRenders[0]).toMatchObject({
+      annotations: [pdfAnnotation],
+      documentId: 'doc-1',
+      fileUrl: 'file:///C:/library/doc-1.pdf',
+    })
+    expect(screen.queryByTitle('PDF 预览：Attention Is All You Need')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Attention Is All You Need' }))
       .toBeInTheDocument()
   })
@@ -153,5 +232,21 @@ describe('ReaderView', () => {
     fireEvent.click(screen.getByRole('button', { name: '外部打开' }))
 
     expect(props.onOpenExternal).toHaveBeenCalledWith('doc-2')
+  })
+
+  it('renders Markdown documents inside the reader', () => {
+    renderReaderView({
+      fileUrl: null,
+      markdownContent: '# 研究计划\n\n- 梳理控制方向\n- 标注重点论文',
+      selectedDocumentId: 'doc-3',
+    })
+
+    expect(
+      screen.getByRole('heading', { name: '研究计划' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('梳理控制方向')).toBeInTheDocument()
+    expect(
+      screen.queryByText('此文件类型不能在阅读区预览'),
+    ).not.toBeInTheDocument()
   })
 })
