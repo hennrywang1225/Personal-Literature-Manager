@@ -6,3 +6,5 @@ coverage/
 .vite/
 *.log
 LiteratureLibrary/
+
+.superpowers/
